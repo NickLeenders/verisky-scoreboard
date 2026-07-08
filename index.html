@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VeriSky Scoreboard: which weather model actually gets it right?</title>
+  <!-- BAKE:META -->
+  <meta name="description" content="Which weather model is most accurate in Amsterdam? HARM leads at 58/100 over the last 30 days — IFS, AIFS, GFS and ICON scored against the same observed series (temp, rain, wind, every lead time)." />
+  <!-- /BAKE:META -->
+  <meta name="theme-color" content="#05080f" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%234c8dff'/%3E%3Cpath d='M4.5 8.5l2.5 2.5 4.5-5' stroke='%2305080f' stroke-width='2' fill='none'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">VeriSky <span class="brand-sub">scoreboard</span></span>
+    <div class="city-controls">
+      <select id="city-select" aria-label="City"></select>
+      <span class="search-wrap">
+        <input id="city-search" type="search" placeholder="your city…" autocomplete="off"
+          aria-label="Search any city" />
+        <ul id="search-results" role="listbox" hidden></ul>
+      </span>
+      <div class="unit-toggle" id="unit-toggle" role="group" aria-label="Units"
+        title="Switch all units — temperature, wind and rain">
+        <button type="button" data-units="metric" class="active" aria-pressed="true">°C</button>
+        <button type="button" data-units="imperial" aria-pressed="false">°F</button>
+      </div>
+    </div>
+    <span class="window-wrap">
+      <span id="window-label" class="window-label">last 30 days · all lead days</span>
+      <span id="status" class="status"></span>
+    </span>
+  </header>
+
+  <main>
+    <section class="card" id="standings" aria-label="Model standings">
+      <div id="standings-body" class="card-body">
+        <!-- BAKE:STANDINGS -->
+        <table class="standings"><thead><tr>
+    <th class="c-rank">#</th><th class="c-move"></th>
+    <th>Model</th><th class="c-skill">Skill</th>
+    <th class="c-metric">Temp</th><th class="c-metric">Rain</th><th class="c-metric">Wind</th>
+    <th class="c-record">Rain W–L</th><th class="c-form">Form</th>
+  </tr></thead><tbody><tr class="standing">
+      <td class="c-rank num">1</td>
+      <td class="c-move"><span class="move move-up">▲</span></td>
+      <td class="c-model"><span class="mdot" style="background:#D97706"></span>
+        <span class="mlabel">HARM</span> <span class="mprov">KNMI</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">58</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:58.416498939013906%"></span></span></td>
+      <td class="num c-metric tone-ok">71</td><td class="num c-metric tone-bad">38</td><td class="num c-metric tone-ok">66</td>
+      <td class="num c-record">24–6</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">2</td>
+      <td class="c-move"><span class="move move-down">▼</span></td>
+      <td class="c-model"><span class="mdot" style="background:#0EA5E9"></span>
+        <span class="mlabel">AIFS</span> <span class="mprov">ECMWF</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">58</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:57.9788093698642%"></span></span></td>
+      <td class="num c-metric tone-ok">69</td><td class="num c-metric tone-bad">36</td><td class="num c-metric tone-ok">69</td>
+      <td class="num c-record">23–7</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">3</td>
+      <td class="c-move"><span class="move move-flat">—</span></td>
+      <td class="c-model"><span class="mdot" style="background:#EC4899"></span>
+        <span class="mlabel">UKMO</span> <span class="mprov">Met Office</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">55</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:55.280846416301806%"></span></span></td>
+      <td class="num c-metric tone-ok">67</td><td class="num c-metric tone-bad">33</td><td class="num c-metric tone-ok">66</td>
+      <td class="num c-record">19–11</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">4</td>
+      <td class="c-move"><span class="move move-up">▲3</span></td>
+      <td class="c-model"><span class="mdot" style="background:#F97316"></span>
+        <span class="mlabel">AIGFS</span> <span class="mprov">NOAA</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">55</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:55.15411325110558%"></span></span></td>
+      <td class="num c-metric tone-ok">64</td><td class="num c-metric tone-bad">32</td><td class="num c-metric tone-ok">69</td>
+      <td class="num c-record">22–8</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">5</td>
+      <td class="c-move"><span class="move move-up">▲</span></td>
+      <td class="c-model"><span class="mdot" style="background:#2563EB"></span>
+        <span class="mlabel">IFS</span> <span class="mprov">ECMWF</span></td>
+      <td class="c-skill"><span class="num skill-num tone-bad">55</span>
+        <span class="bar"><span class="bar-fill tone-bg-bad" style="width:54.77220281641315%"></span></span></td>
+      <td class="num c-metric tone-ok">63</td><td class="num c-metric tone-bad">35</td><td class="num c-metric tone-ok">66</td>
+      <td class="num c-record">21–9</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">6</td>
+      <td class="c-move"><span class="move move-down">▼</span></td>
+      <td class="c-model"><span class="mdot" style="background:#059669"></span>
+        <span class="mlabel">ICON</span> <span class="mprov">DWD</span></td>
+      <td class="c-skill"><span class="num skill-num tone-bad">55</span>
+        <span class="bar"><span class="bar-fill tone-bg-bad" style="width:54.565236076383066%"></span></span></td>
+      <td class="num c-metric tone-ok">68</td><td class="num c-metric tone-bad">30</td><td class="num c-metric tone-ok">65</td>
+      <td class="num c-record">26–4</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">7</td>
+      <td class="c-move"><span class="move move-down">▼3</span></td>
+      <td class="c-model"><span class="mdot" style="background:#8B5CF6"></span>
+        <span class="mlabel">MeteoFR</span> <span class="mprov">Météo-France</span></td>
+      <td class="c-skill"><span class="num skill-num tone-bad">54</span>
+        <span class="bar"><span class="bar-fill tone-bg-bad" style="width:54.48960125414359%"></span></span></td>
+      <td class="num c-metric tone-ok">72</td><td class="num c-metric tone-bad">37</td><td class="num c-metric tone-none">—</td>
+      <td class="num c-record">21–9</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">8</td>
+      <td class="c-move"><span class="move move-flat">—</span></td>
+      <td class="c-model"><span class="mdot" style="background:#DC2626"></span>
+        <span class="mlabel">GFS</span> <span class="mprov">NOAA</span></td>
+      <td class="c-skill"><span class="num skill-num tone-bad">50</span>
+        <span class="bar"><span class="bar-fill tone-bg-bad" style="width:49.54651918218851%"></span></span></td>
+      <td class="num c-metric tone-ok">58</td><td class="num c-metric tone-bad">27</td><td class="num c-metric tone-ok">64</td>
+      <td class="num c-record">24–6</td>
+      <td class="c-form"><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span></td>
+    </tr></tbody></table>
+        <!-- /BAKE:STANDINGS -->
+      </div>
+    </section>
+
+    <div class="two-up">
+      <section class="card" id="receipt" aria-label="Yesterday's receipt">
+        <h2>Yesterday's receipt <span id="receipt-sub" class="card-sub"></span></h2>
+        <div id="receipt-body" class="card-body">
+          <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+        </div>
+      </section>
+      <section class="card" id="leadtime" aria-label="Skill by lead time">
+        <h2>Skill by lead time</h2>
+        <div id="lead-body" class="card-body">
+          <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="strip" id="calls" aria-label="Other calls">
+      <div id="calls-body"></div>
+    </section>
+
+    <section class="app-cta" aria-label="Get the VeriSky app">
+      <span class="app-cta-label">Get the weather forecast app <span class="app-cta-free">Free</span></span>
+      <div class="app-badges">
+        <a class="app-badge" href="https://apps.apple.com/nl/app/verisky/id6759251875"
+          target="_blank" rel="noopener" aria-label="Download VeriSky on the App Store">
+          <svg viewBox="0 0 120 40" role="img" aria-hidden="true" focusable="false">
+            <rect x="0.5" y="0.5" width="119" height="39" rx="7" fill="#000"
+              stroke="#a6a6a6" stroke-opacity="0.55" />
+            <path fill="#fff" transform="translate(13,8.4) scale(0.95)"
+              d="M15.769 0h.162c.13 1.606-.483 2.806-1.228 3.675-.731.863-1.732 1.7-3.351 1.573-.108-1.583.506-2.694 1.25-3.561C13.292.878 14.557.226 15.769 0zm4.917 17.526v.043c-.455 1.38-1.104 2.563-1.896 3.66-.723.995-1.609 2.334-3.191 2.334-1.367 0-2.275-.879-3.676-.903-1.482-.024-2.297.735-3.652.926h-.462c-.995-.144-1.798-.932-2.383-1.642-1.725-2.098-3.058-4.808-3.306-8.276v-1.019c.105-2.482 1.311-4.5 2.914-5.478.846-.52 2.009-.963 3.304-.765.555.086 1.122.276 1.619.464.471.181 1.06.502 1.618.485.378-.011.754-.208 1.135-.347 1.116-.403 2.21-.865 3.652-.648 1.733.262 2.963 1.032 3.723 2.22-1.466.933-2.625 2.339-2.427 4.74.176 2.18 1.444 3.457 3.157 4.037z" />
+            <text x="42" y="16" fill="#fff" font-size="7.5" letter-spacing="0.4"
+              font-family="system-ui,-apple-system,'Segoe UI',sans-serif">Download on the</text>
+            <text x="41.4" y="31" fill="#fff" font-size="15.5" font-weight="600" letter-spacing="-0.3"
+              font-family="system-ui,-apple-system,'Segoe UI',sans-serif">App Store</text>
+          </svg>
+        </a>
+        <a class="app-badge" href="https://play.google.com/store/apps/details?id=com.verisky.app&hl=nl"
+          target="_blank" rel="noopener" aria-label="Get VeriSky on Google Play">
+          <svg viewBox="0 0 135 40" role="img" aria-hidden="true" focusable="false">
+            <rect x="0.5" y="0.5" width="134" height="39" rx="7" fill="#000"
+              stroke="#a6a6a6" stroke-opacity="0.55" />
+            <g transform="translate(13,8.2) scale(0.0475)">
+              <path fill="#00C3FF" d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1z" />
+              <path fill="#00E676" d="M47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0z" />
+              <path fill="#FFCE00" d="M472.2 225.6l-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8z" />
+              <path fill="#FF3D00" d="M104.6 499l280.8-161.2-60.1-60.1L104.6 499z" />
+            </g>
+            <text x="44" y="16" fill="#fff" font-size="7" letter-spacing="1.2"
+              font-family="system-ui,-apple-system,'Segoe UI',sans-serif">GET IT ON</text>
+            <text x="43.4" y="31" fill="#fff" font-size="15.5" font-weight="600" letter-spacing="-0.2"
+              font-family="system-ui,-apple-system,'Segoe UI',sans-serif">Google Play</text>
+          </svg>
+        </a>
+      </div>
+    </section>
+
+    <footer class="methodology">
+      <p class="method-lede">
+        Every model is verified against the <b>same observed series</b>
+        (Open-Meteo <code>best_match</code>), never against its own day-0 analysis,
+        so no model grades its own homework.
+      </p>
+      <details>
+        <summary>How scoring works</summary>
+        <div class="method-body">
+          <p><b>Per-lead scores (0 to 100)</b> use the same formulas as the VeriSky app, with the
+            error caps tuned for this board, on hourly forecast/observation pairs over the last 30 days:</p>
+          <ul>
+            <li><b>Temperature:</b> RMSE mapped to a 0 to 100 scale with a 6.5&nbsp;°C cap.
+              <code>score&nbsp;=&nbsp;(1&nbsp;−&nbsp;RMSE/6.5)·100</code>, floored at 0.</li>
+            <li><b>Wind:</b> normalized RMSE, where the cap scales with local wind climate
+              (<code>max(14&nbsp;km/h, 60% of mean observed wind)</code>), so windy coasts are judged
+              on relative error rather than raw km/h.</li>
+            <li><b>Rain:</b> F1 of rain/no-rain calls at a 0.1&nbsp;mm/h threshold with a
+              0.1&nbsp;mm deadband (drizzle right at the threshold is a coin flip, not skill).
+              Rain is only scored when the window had a genuine rain signal
+              (≥&nbsp;3 rain-event hours totalling ≥&nbsp;1&nbsp;mm), since otherwise every model
+              would ace a dry month.</li>
+          </ul>
+          <p><b>The headline Skill number</b> is a soft horizon-adjusted score. First,
+            each model gets its 1/d-weighted score over the lead days it actually serves.
+            Then that score is multiplied by <code>0.75&nbsp;+&nbsp;0.25·C</code>, where
+            <code>C</code> is the share of the full 1/d-weighted 7-day horizon it covers.
+            Tomorrow counts 7× as much as next week, which is roughly how much people lean
+            on each, while accurate longer-range forecasts still add points. A perfect
+            D-1-only model can score about 85 instead of being treated as a failed 7-day
+            model; a perfect D-1…D-7 model can reach 100. Per-metric columns use the same
+            weighting.</p>
+          <p><b>Rain W–L and form dots</b> are next-day (D-1) only, since "did it rain the next
+            day" is the question most people care about. A win is a correct daily rain/no-rain
+            call at 0.1&nbsp;mm; a form dot fills when that day's next-day skill ≥ 70.
+            The ▲▼ movement column compares today's ranking with the same table computed
+            a week ago (the window minus its last 7 days).</p>
+          <p>Forecasts come from Open-Meteo's
+            <a href="https://open-meteo.com/en/docs/previous-runs-api">previous runs archive</a>
+            (what each model actually said 1 to 7 days earlier); observations from its
+            <code>best_match</code> ground-truth series. The most recent (incomplete) day is
+            always excluded. Data is cached locally for ~6 hours.</p>
+        </div>
+      </details>
+      <p class="colophon">
+        static + serverless, scored daily in CI and re-scored live in your browser ·
+        <!-- BAKE:GENERATED --> baked 2026-07-07 16:11 UTC · <!-- /BAKE:GENERATED -->
+        <a href="https://github.com/NickLeenders/verisky-scoreboard">source</a> · data by
+        <a href="https://open-meteo.com/">Open-Meteo</a> (CC-BY 4.0)
+      </p>
+    </footer>
+  </main>
+
+  <noscript><p class="error" style="padding:1rem">This scoreboard fetches and scores live data in your browser, so it needs JavaScript.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

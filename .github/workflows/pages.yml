@@ -1,0 +1,67 @@
+# Daily SEO / first-paint bake + GitHub Pages deploy (plan.md §7).
+#
+# Runs the same Node scoring the browser runs (scripts/bake.mjs), which writes
+# data/*.json + a static standings table/headline into index.html, then deploys
+# the result to Pages. Deploy only runs if the bake job succeeds, so a failed
+# bake leaves the previous deployment live.
+#
+# One-time setup: repo Settings → Pages → Build and deployment →
+#   Source: "GitHub Actions"  (not "Deploy from a branch").
+name: Bake & deploy scoreboard
+
+on:
+  schedule:
+    - cron: '17 5 * * *' # daily ~05:17 UTC (after the day's runs are archived)
+  push:
+    branches: [main] # redeploy on content/code changes too
+  workflow_dispatch: {} # manual "Run workflow" button
+
+# Least privilege + the OIDC token the Pages deploy needs.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys at once; let an in-progress deploy finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Fetch + score every city live, in Node. Exits non-zero only if ALL
+      # cities fail, which keeps the last good deployment in place.
+      - name: Bake scores
+        run: node scripts/bake.mjs
+
+      # Assemble the servable site, excluding VCS/CI internals so .git isn't shipped.
+      - name: Assemble site
+        run: |
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='_site' \
+            ./ _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

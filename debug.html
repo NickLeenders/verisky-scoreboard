@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VeriSky Scoreboard — pipeline debug</title>
+  <meta name="robots" content="noindex" />
+  <style>
+    /* Deliberately minimal: this page verifies the data + scoring pipeline
+       (plan.md §1–§4). The locked page design (§8) replaces it later. */
+    :root { color-scheme: dark; }
+    body {
+      margin: 0 auto; max-width: 72rem; padding: 1.5rem;
+      background: #0b0f14; color: #dbe4ee;
+      font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.45;
+    }
+    h1 { font-size: 1.15rem; }
+    h2 { font-size: 1rem; margin: 2rem 0 0.25rem; }
+    .meta, .note { color: #8a97a6; font-size: 0.85rem; }
+    .error { color: #f47067; }
+    table { border-collapse: collapse; margin: 0.5rem 0 0.75rem; }
+    th, td { padding: 0.25rem 0.7rem 0.25rem 0; text-align: left; white-space: nowrap; }
+    th { color: #8a97a6; font-weight: 500; font-size: 0.8rem; }
+    td.num { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+    .dot { display: inline-block; width: 0.6em; height: 0.6em; border-radius: 50%; margin-right: 0.15em; }
+    details { margin: 0.25rem 0; }
+    summary { cursor: pointer; color: #8a97a6; font-size: 0.85rem; }
+    section.city { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>VeriSky Scoreboard — pipeline debug harness</h1>
+  <p class="note">
+    Steps 1–4 of the plan: config → fetch (truth + previous runs) → alignment →
+    scoring ported from the app. Every model is verified against the same
+    observed series (<code>best_match</code>); skill is the soft horizon-adjusted
+    1/d score over lead days 1–7.
+  </p>
+  <div id="app"></div>
+  <script type="module" src="js/debug.js"></script>
+</body>
+</html>
