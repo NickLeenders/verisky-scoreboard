@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VeriSky · Have the weather models degraded? Long-term model trends</title>
+  <meta name="description" content="Long-term accuracy trends for NOAA's weather models (GFS, AIGFS, NBM) at New York — verified forecast error over each model's full previous-runs archive, one month at a time, against the same observed series." />
+  <meta name="theme-color" content="#05080f" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%234c8dff'/%3E%3Cpath d='M4.5 8.5l2.5 2.5 4.5-5' stroke='%2305080f' stroke-width='2' fill='none'/%3E%3C/svg%3E" />
+  <style>
+    /* history-only additions (main scoreboard design stays locked) */
+    .back-link { font-size: 0.85rem; color: var(--text-2); text-decoration: none; }
+    .back-link:hover { color: var(--text); }
+    .trend-controls { display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem; align-items: center; }
+    .trend-controls .ctl { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .trend-controls .ctl-label { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+    .trend-headline { font-size: 0.95rem; color: var(--text); margin: 0.2rem 0 0.7rem; line-height: 1.5; }
+    .trend-headline b { color: var(--text); }
+    .trend-headline .up { color: var(--tone-bad); }
+    .trend-headline .down { color: var(--observed); }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0.5rem 0 0; }
+    .legend span { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: var(--text-2); }
+    .legend .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">VeriSky <span class="brand-sub">trends</span></span>
+    <a class="back-link" href="./">← scoreboard</a>
+    <div class="unit-toggle" id="unit-toggle" role="group" aria-label="Units"
+      title="Switch temperature and wind units">
+      <button type="button" data-units="metric" class="active" aria-pressed="true">°C</button>
+      <button type="button" data-units="imperial" aria-pressed="false">°F</button>
+    </div>
+    <span class="window-wrap">
+      <span id="window-label" class="window-label">loading…</span>
+      <span id="status" class="status"></span>
+    </span>
+  </header>
+
+  <main>
+    <section class="card" aria-label="Model quality over time">
+      <div class="lab-head">
+        <span class="lab-title">Have the models degraded? · <span id="city-name">New York</span></span>
+        <div class="trend-controls">
+          <span class="ctl"><span class="ctl-label">Metric</span>
+            <span class="metric-tabs" id="var-tabs" role="group" aria-label="Variable"></span></span>
+          <span class="ctl"><span class="ctl-label">Lead</span>
+            <span class="lead-toggle" id="lead-tabs" role="group" aria-label="Lead time"></span></span>
+          <span class="ctl"><span class="ctl-label">View</span>
+            <span class="metric-tabs" id="smooth-tabs" role="group" aria-label="Smoothing"></span></span>
+        </div>
+      </div>
+      <p id="headline" class="trend-headline"></p>
+      <div id="chart" class="card-body"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+      <div class="legend" id="legend"></div>
+      <p class="chart-caption" id="caption"></p>
+    </section>
+
+    <footer class="methodology">
+      <p class="method-lede">
+        Each model is scored against the <b>same observed series</b>
+        (Open-Meteo <code>best_match</code>) it is scored against on the live board —
+        here over its <b>full previous-runs archive</b>, one calendar month at a time,
+        so you can see whether accuracy has drifted.
+      </p>
+      <details>
+        <summary>How to read this</summary>
+        <div class="method-body">
+          <p>Every point is one calendar month, scored exactly like the live 30-day window
+            but over that month's hourly forecast/observation pairs, bucketed by the time the
+            forecast was <b>valid</b>. Only complete months are shown (never the current one).</p>
+          <ul>
+            <li><b>Temp / Wind</b> show <b>RMSE</b> (root-mean-square error) in real units —
+              <i>lower is better</i>. Temperature errors are naturally larger in winter, so the
+              bold line is a <b>trailing 12-month average</b> that cancels the seasonal cycle;
+              the faint dots are the raw monthly values. Switch <b>View</b> to see the monthly
+              numbers directly.</li>
+            <li><b>Combined</b> and <b>Rain</b> use the board's 0–100 skill scores
+              (<i>higher is better</i>) — Combined is the lead-weighted headline skill, Rain is
+              the F1 of rain/no-rain calls. Rain has gaps in dry months, where there is no rain
+              signal to score.</li>
+            <li><b>Lead</b> picks the forecast horizon: <b>D-1</b> is "what it said 24 h ahead",
+              up to <b>D-7</b>. <b>All</b> combines horizons (1/d-weighted).</li>
+          </ul>
+          <p>Two honest caveats. The <code>best_match</code> truth series' own composition can
+            shift over the years, so a trend partly reflects the yardstick, not only the model.
+            And these are "seamless" products — a rising or falling line includes the model
+            <b>upgrades</b> that happened over this period, which is exactly what a
+            "has it changed?" question is asking. Models with no independent previous-runs
+            archive at this location (HRRR duplicates GFS at short lead; NAM has none) are
+            omitted.</p>
+          <p>Data from Open-Meteo's
+            <a href="https://open-meteo.com/en/docs/previous-runs-api">previous-runs</a> and
+            <a href="https://open-meteo.com/en/docs/historical-forecast-api">historical-forecast</a>
+            APIs, baked offline. v1 covers NOAA's models at New York.</p>
+        </div>
+      </details>
+      <p class="colophon">
+        <a href="./">← back to the scoreboard</a> · <span id="generated"></span>
+        <a href="https://github.com/NickLeenders/verisky-scoreboard">source</a> · data by
+        <a href="https://open-meteo.com/">Open-Meteo</a> (CC-BY 4.0)
+      </p>
+    </footer>
+  </main>
+
+  <noscript><p class="error" style="padding:1rem">This page renders a chart from baked JSON in your browser, so it needs JavaScript.</p></noscript>
+  <script type="module" src="js/history.js"></script>
+</body>
+</html>

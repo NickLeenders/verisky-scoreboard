@@ -411,6 +411,131 @@ export function ghostChart(ghost, { width = 620, height = 190 } = {}) {
   return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Forecast vs observed temperature">${parts.join('')}</svg>`;
 }
 
+// ── Long-term trend (history.html: skill / error over calendar months) ───────
+
+/**
+ * A y-axis snapped to a round step, like zoomAxis but without the 0–100 clamp,
+ * so it also frames un-bounded error metrics (RMSE). Floors at 0 (scores and
+ * errors are both non-negative); an optional ceiling caps scores at 100.
+ * @param {number[]} values
+ */
+function trendAxis(values, { ceil = null, target = 4 } = {}) {
+  if (values.length === 0) return { lo: 0, hi: 1, ticks: [0, 1] };
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const pad = Math.max((max - min) * 0.15, (max || 1) * 0.05);
+  const rawLo = Math.max(0, min - pad);
+  const rawHi = ceil != null ? Math.min(ceil, max + pad) : max + pad;
+  const span = rawHi - rawLo || 1;
+  const rawStep = span / target;
+  const mag = 10 ** Math.floor(Math.log10(rawStep));
+  const norm = rawStep / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const lo = Math.max(0, Math.floor(rawLo / step) * step);
+  const hi = (ceil != null ? Math.min(ceil, Math.ceil(rawHi / step) * step) : Math.ceil(rawHi / step) * step);
+  const ticks = [];
+  for (let t = lo; t <= hi + step * 1e-6; t += step) ticks.push(Math.round(t * 1000) / 1000);
+  return { lo, hi, ticks };
+}
+
+const lastNonNull = (series) => {
+  for (let i = series.length - 1; i >= 0; i--) if (series[i] != null) return { i, v: series[i] };
+  return null;
+};
+
+/**
+ * One line per model over a shared calendar-month axis. Each series carries a
+ * `monthly` array (noisy, drawn faint) and a `rolling` array (the trailing
+ * 12-month mean, drawn bold) aligned to `months`. Models with too little
+ * history to smooth (rolling all null) fall back to prominent monthly dots.
+ *
+ * @param {Array<{model:Object, monthly:Array<number|null>, rolling:Array<number|null>}>} seriesList
+ * @param {string[]} months  "YYYY-MM", ascending — the shared x axis.
+ * @param {{unit?:string, ceil?:number|null, lowerBetter?:boolean, caption?:string, width?:number, height?:number}} opts
+ */
+export function trendChart(seriesList, months, opts = {}) {
+  const { unit = '', ceil = null, lowerBetter = false, caption = '', width = 720, height = 340 } = opts;
+  const L = 40;
+  const R = 78;
+  const T = 22;
+  const B = 26;
+  const plotW = width - L - R;
+  const plotH = height - T - B;
+  const n = months.length;
+
+  const allValues = seriesList.flatMap((s) => [...s.monthly, ...s.rolling]).filter((v) => v != null);
+  const { lo, hi, ticks } = trendAxis(allValues, { ceil });
+  const x = (i) => L + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
+  const y = (v) => T + (1 - (v - lo) / (hi - lo)) * plotH;
+  const fmt = (v) => (unit === '' ? Math.round(v) : v.toFixed(1));
+
+  const parts = [];
+
+  // Horizontal gridlines + value labels.
+  for (const tick of ticks) {
+    parts.push(
+      `<line x1="${L}" x2="${L + plotW}" y1="${px(y(tick))}" y2="${px(y(tick))}" stroke="${C.grid}" stroke-width="0.5" stroke-dasharray="2 4"/>`,
+      `<text x="${L - 6}" y="${px(y(tick) + 3)}" fill="${C.textMuted}" font-size="9" text-anchor="end">${fmt(tick)}</text>`,
+    );
+  }
+
+  // Vertical year gridlines at each January (and the first month).
+  for (let i = 0; i < n; i++) {
+    const isJan = months[i].slice(5) === '01';
+    if (!isJan && i !== 0) continue;
+    parts.push(
+      `<line x1="${px(x(i))}" x2="${px(x(i))}" y1="${T}" y2="${T + plotH}" stroke="${C.grid}" stroke-width="0.5" opacity="0.4"/>`,
+      `<text x="${px(x(i))}" y="${T + plotH + 16}" fill="${C.textMuted}" font-size="9" text-anchor="middle">${months[i].slice(0, 4)}</text>`,
+    );
+  }
+
+  // Axis caption (unit + direction) top-left.
+  if (caption) {
+    parts.push(
+      `<text x="${L}" y="${T - 9}" fill="${C.textSecondary}" font-size="10">${esc(caption)}${lowerBetter ? ' · lower is better' : ' · higher is better'}</text>`,
+    );
+  }
+
+  // Faint monthly lines + dots behind, bold rolling lines on top.
+  for (const s of seriesList) {
+    for (const run of nonNullRuns(s.monthly, x, y)) {
+      parts.push(
+        `<path d="${run.length > 1 ? monotonePath(run) : polyline(run)}" stroke="${s.model.color}" stroke-width="1" fill="none" opacity="0.28"/>`,
+      );
+    }
+    const hasRolling = s.rolling.some((v) => v != null);
+    for (let i = 0; i < n; i++) {
+      if (s.monthly[i] == null) continue;
+      parts.push(
+        `<circle cx="${px(x(i))}" cy="${px(y(s.monthly[i]))}" r="${hasRolling ? 1.4 : 2}" fill="${s.model.color}" opacity="${hasRolling ? 0.32 : 0.85}"/>`,
+      );
+    }
+  }
+  for (const s of seriesList) {
+    for (const run of nonNullRuns(s.rolling, x, y)) {
+      parts.push(
+        `<path d="${run.length > 1 ? monotonePath(run) : polyline(run)}" stroke="${s.model.color}" stroke-width="2.2" fill="none"/>`,
+      );
+    }
+  }
+
+  // Right-edge direct labels at each model's last rolling value (or last monthly).
+  const labels = [];
+  for (const s of seriesList) {
+    const end = lastNonNull(s.rolling) ?? lastNonNull(s.monthly);
+    if (!end) continue;
+    labels.push({ text: s.model.label, color: s.model.color, y: y(end.v), value: end.v });
+  }
+  spreadLabels(labels, 12, T + 4, T + plotH);
+  for (const l of labels) {
+    parts.push(
+      `<text x="${L + plotW + 6}" y="${px(l.y + 3)}" fill="${l.color}" font-size="10" font-weight="600">${esc(l.text)} ${fmt(l.value)}</text>`,
+    );
+  }
+
+  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Model ${lowerBetter ? 'error' : 'skill'} over time">${parts.join('')}</svg>`;
+}
+
 // ── Skill vs field median by lead (lab row mini chart) ───────────────────────
 
 export function medianChart(points, color, { width = 280, height = 150 } = {}) {

@@ -172,12 +172,14 @@ function finalizeLead(acc, rainEligible) {
   return {
     temperature: {
       score: rmseScore(acc.tempSumSq, acc.tempCount, TEMP_RMSE_CAP_C),
+      rmse: acc.tempCount > 0 ? Math.sqrt(acc.tempSumSq / acc.tempCount) : null,
       mae: acc.tempCount > 0 ? acc.tempAbsSum / acc.tempCount : null,
       bias: acc.tempCount > 0 ? acc.tempBiasSum / acc.tempCount : null,
       count: acc.tempCount,
     },
     wind: {
       score: windRmseScore(acc.windSumSq, acc.windCount, acc.windActualSum),
+      rmse: acc.windCount > 0 ? Math.sqrt(acc.windSumSq / acc.windCount) : null,
       mae: acc.windCount > 0 ? acc.windAbsSum / acc.windCount : null,
       bias: acc.windCount > 0 ? acc.windBiasSum / acc.windCount : null,
       count: acc.windCount,

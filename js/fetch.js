@@ -30,7 +30,7 @@ const backoff = (attempt) => sleep(800 * (attempt + 1) + Math.random() * 400);
  * especially from CI runners' shared IPs). Both are transient, so retry both
  * with backoff; only surface an error once the retries are exhausted.
  */
-async function fetchJson(url, retries = 3) {
+export async function fetchJson(url, retries = 3) {
   for (let attempt = 0; ; attempt++) {
     let res;
     try {
@@ -117,16 +117,24 @@ export async function fetchPredictions(city) {
  * Reshape the previous-runs response (flat, model-suffixed keys like
  * `temperature_2m_previous_day3_gfs_seamless`) into
  * `pred[modelId][variable][leadDay] = values[]`.
+ *
+ * When several models are requested, Open-Meteo suffixes every hourly key with
+ * the model id. When a SINGLE model is requested it omits the suffix (the keys
+ * come back as plain `temperature_2m_previous_day3`), so we fall back to the
+ * unsuffixed key. That fallback never fires for the multi-model live path (the
+ * suffixed key is always present there); it only serves single-model callers
+ * like the history backfill.
  */
 export function normalizePredictions(hourly, modelIds) {
+  const single = modelIds.length === 1;
   const pred = {};
   for (const modelId of modelIds) {
     pred[modelId] = {};
     for (const [variable, apiName] of Object.entries(VARIABLES)) {
       const perLead = {};
       for (const day of LEAD_DAYS) {
-        const key = `${apiName}_previous_day${day}_${modelId}`;
-        const values = hourly[key];
+        const base = `${apiName}_previous_day${day}`;
+        const values = hourly[`${base}_${modelId}`] ?? (single ? hourly[base] : undefined);
         if (values) perLead[day] = values;
       }
       pred[modelId][variable] = perLead;
