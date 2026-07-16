@@ -536,6 +536,104 @@ export function trendChart(seriesList, months, opts = {}) {
   return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Model ${lowerBetter ? 'error' : 'skill'} over time">${parts.join('')}</svg>`;
 }
 
+// ── Year-over-year overlay (history.html: one line per calendar year) ────────
+
+/**
+ * Ordinal single-hue ramp for year lines, dim → bright = oldest → newest.
+ * Validated against the card surface #0b101c (monotone lightness, ΔL ≥ 0.06
+ * per step, dim end ≥ 2:1 contrast, single hue ~262°). The newest year always
+ * takes the brightest step, so short archives use the bright end of the ramp.
+ */
+const YEAR_RAMP = ['#2c56a8', '#3f6bbf', '#5381d6', '#6796ee', '#85aef9', '#a7c5fa', '#c9dcfc'];
+
+export function yearColor(i, n) {
+  return YEAR_RAMP[Math.max(0, YEAR_RAMP.length - n + i)];
+}
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * One line per calendar year on a fixed Jan–Dec axis, for a single model.
+ * Stacking the years vertically aligns the seasonal cycle, so a recent year
+ * drifting worse reads as a bright line riding above (errors) or below
+ * (skill) the dim older stack — no smoothing needed to cancel seasonality.
+ * The newest year is drawn bold; every point carries a native tooltip.
+ *
+ * @param {Array<{year:number, values:Array<number|null>}>} yearsList
+ *   Ascending years; `values` has 12 slots (Jan..Dec), null = no data.
+ * @param {{unit?:string, ceil?:number|null, lowerBetter?:boolean, caption?:string, width?:number, height?:number}} opts
+ */
+export function yearOverlayChart(yearsList, opts = {}) {
+  const { unit = '', ceil = null, lowerBetter = false, caption = '', width = 720, height = 340 } = opts;
+  const L = 40;
+  const R = 78;
+  const T = 22;
+  const B = 26;
+  const plotW = width - L - R;
+  const plotH = height - T - B;
+
+  const allValues = yearsList.flatMap((s) => s.values).filter((v) => v != null);
+  const { lo, hi, ticks } = trendAxis(allValues, { ceil });
+  const x = (m) => L + (m / 11) * plotW;
+  const y = (v) => T + (1 - (v - lo) / (hi - lo)) * plotH;
+  const fmt = (v) => (unit === '' ? Math.round(v) : v.toFixed(1));
+
+  const parts = [];
+
+  for (const tick of ticks) {
+    parts.push(
+      `<line x1="${L}" x2="${L + plotW}" y1="${px(y(tick))}" y2="${px(y(tick))}" stroke="${C.grid}" stroke-width="0.5" stroke-dasharray="2 4"/>`,
+      `<text x="${L - 6}" y="${px(y(tick) + 3)}" fill="${C.textMuted}" font-size="9" text-anchor="end">${fmt(tick)}</text>`,
+    );
+  }
+  for (let m = 0; m < 12; m++) {
+    parts.push(
+      `<line x1="${px(x(m))}" x2="${px(x(m))}" y1="${T}" y2="${T + plotH}" stroke="${C.grid}" stroke-width="0.5" opacity="0.3"/>`,
+      `<text x="${px(x(m))}" y="${T + plotH + 16}" fill="${C.textMuted}" font-size="9" text-anchor="middle">${MONTH_NAMES[m]}</text>`,
+    );
+  }
+  if (caption) {
+    parts.push(
+      `<text x="${L}" y="${T - 9}" fill="${C.textSecondary}" font-size="10">${esc(caption)}${lowerBetter ? ' · lower is better' : ' · higher is better'}</text>`,
+    );
+  }
+
+  // Dim older years first, the newest bold on top.
+  const n = yearsList.length;
+  yearsList.forEach((s, k) => {
+    const newest = k === n - 1;
+    const color = yearColor(k, n);
+    for (const run of nonNullRuns(s.values, x, y)) {
+      parts.push(
+        `<path d="${run.length > 1 ? monotonePath(run) : polyline(run)}" stroke="${color}" stroke-width="${newest ? 2.4 : 1.5}" fill="none" opacity="${newest ? 1 : 0.85}"/>`,
+      );
+    }
+    for (let m = 0; m < 12; m++) {
+      if (s.values[m] == null) continue;
+      parts.push(
+        `<circle cx="${px(x(m))}" cy="${px(y(s.values[m]))}" r="${newest ? 2.4 : 1.8}" fill="${color}">` +
+        `<title>${MONTH_NAMES[m]} ${s.year} · ${fmt(s.values[m])}${unit ? ` ${esc(unit)}` : ''}</title></circle>`,
+      );
+    }
+  });
+
+  // Right-edge direct labels at each year's last value.
+  const labels = [];
+  yearsList.forEach((s, k) => {
+    const end = lastNonNull(s.values);
+    if (!end) return;
+    labels.push({ text: String(s.year), color: yearColor(k, n), y: y(end.v), value: end.v, bold: k === n - 1 });
+  });
+  spreadLabels(labels, 12, T + 4, T + plotH);
+  for (const l of labels) {
+    parts.push(
+      `<text x="${L + plotW + 6}" y="${px(l.y + 3)}" fill="${l.color}" font-size="10"${l.bold ? ' font-weight="700"' : ' font-weight="600"'}>${l.text} ${fmt(l.value)}</text>`,
+    );
+  }
+
+  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Model ${lowerBetter ? 'error' : 'skill'} by calendar year">${parts.join('')}</svg>`;
+}
+
 // ── Skill vs field median by lead (lab row mini chart) ───────────────────────
 
 export function medianChart(points, color, { width = 280, height = 150 } = {}) {

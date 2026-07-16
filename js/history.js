@@ -7,7 +7,7 @@
  * data; only the displayed RMSE for temperature/wind converts here via units.js.
  */
 
-import { trendChart } from './charts.js';
+import { trendChart, yearOverlayChart, yearColor } from './charts.js';
 import { HISTORY_CITIES } from './history-config.js';
 import {
   asTempDelta, asWind, tempUnit, windUnit,
@@ -29,7 +29,11 @@ const VARS = {
 
 const LEADS = ['all', 1, 2, 3, 4, 5, 6, 7];
 
-const state = { variable: 'temperature', lead: 'all', smooth: 'trend' };
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// `model` only applies to the Yearly view (one model at a time); null until a
+// city's roster is loaded, then resolved by defaultModelId().
+const state = { variable: 'temperature', lead: 'all', smooth: 'trend', model: null };
 let DATA = null;
 
 // ── Value extraction from the baked series ────────────────────────────────────
@@ -151,8 +155,103 @@ function clipToData(seriesList) {
   };
 }
 
+// ── Yearly overlay view ────────────────────────────────────────────────────────
+// One model, one line per calendar year on a Jan–Dec axis. Stacking years
+// aligns the seasonal cycle, so "have recent years gotten worse?" (e.g. after
+// an agency's budget cuts) reads directly as the bright recent lines sitting
+// above or below the dim older stack.
+
+/** GFS by default (deepest archive, and the usual "has NOAA slipped?" question). */
+function defaultModelId() {
+  return DATA.models.some((m) => m.id === 'gfs_seamless') ? 'gfs_seamless' : DATA.models[0].id;
+}
+
+/** Group one model's monthly values into per-year Jan–Dec rows (ascending). */
+function groupByYear(monthly) {
+  const byYear = new Map();
+  DATA.months.forEach((ym, i) => {
+    if (monthly[i] == null) return;
+    const year = Number(ym.slice(0, 4));
+    if (!byYear.has(year)) byYear.set(year, Array(12).fill(null));
+    byYear.get(year)[Number(ym.slice(5)) - 1] = monthly[i];
+  });
+  return [...byYear.keys()].sort((a, b) => a - b).map((year) => ({ year, values: byYear.get(year) }));
+}
+
+function buildYearlyHeadline(model, yearsList) {
+  const meta = VARS[state.variable];
+  const isError = meta.kind === 'error';
+  const latest = yearsList[yearsList.length - 1];
+  const prior = yearsList.slice(0, -1);
+  const monthsIdx = latest.values.map((v, i) => (v != null ? i : -1)).filter((i) => i >= 0);
+  // Compare the latest year against the SAME calendar months of earlier years,
+  // so a partial year (Jan–Jun) is never judged against other years' winters.
+  const baseline = prior.flatMap((yr) => monthsIdx.map((i) => yr.values[i]).filter((v) => v != null));
+  if (!prior.length || monthsIdx.length < 2 || !baseline.length) {
+    return `<b>${model.label}</b>'s archive covers ${yearsList.length === 1 ? 'only one year' : 'too little'} in this view — nothing to compare yet.`;
+  }
+  const cur = meanOf(monthsIdx.map((i) => latest.values[i]));
+  const base = meanOf(baseline);
+  const unit = isError ? ` ${meta.unit()}` : '';
+  const fmt = (v) => (isError ? v.toFixed(1) : Math.round(v));
+  const worse = isError ? cur > base : cur < base;
+  const delta = Math.abs(cur - base);
+  const changed = isError ? delta >= 0.1 : delta >= 1;
+  const dirWord = !changed ? 'is level with' : worse ? 'is worse than' : 'is better than';
+  const dirClass = !changed ? '' : worse ? 'up' : 'down';
+  const monthSpan = monthsIdx.length === 12
+    ? ''
+    : ` (${MONTH_SHORT[monthsIdx[0]]}–${MONTH_SHORT[monthsIdx[monthsIdx.length - 1]]})`;
+  const priorSpan = prior.length === 1 ? String(prior[0].year) : `${prior[0].year}–${prior[prior.length - 1].year}`;
+  const what = isError ? `${state.variable} error` : `${meta.label.toLowerCase()} skill`;
+  return `<b>${model.label}</b>'s ${what} in ${latest.year}${monthSpan} `
+    + `<span class="${dirClass}">${dirWord}</span> the ${priorSpan} same-month average — `
+    + `${fmt(cur)} vs ${fmt(base)}${unit}.`;
+}
+
+function renderYearly() {
+  const meta = VARS[state.variable];
+  const isError = meta.kind === 'error';
+  if (!DATA.models.some((m) => m.id === state.model)) state.model = defaultModelId();
+  const model = DATA.models.find((m) => m.id === state.model);
+  const s = DATA.series[model.id];
+  const monthly = DATA.months.map((_, i) => seriesValue(s, i));
+  const yearsList = groupByYear(monthly);
+
+  const unit = isError ? meta.unit() : '';
+  const caption = isError ? `${meta.name} (${unit})` : meta.caption;
+  if (!yearsList.length) {
+    $('chart').innerHTML = `<p class="empty">No ${state.variable} history for ${model.label} in this view.</p>`;
+    $('headline').textContent = '';
+    $('legend').innerHTML = '';
+    $('caption').textContent = '';
+    $('window-label').textContent = `${DATA.city.name} · no data`;
+    return;
+  }
+
+  $('chart').innerHTML = yearOverlayChart(yearsList, {
+    unit,
+    ceil: isError ? null : 100,
+    lowerBetter: isError,
+    caption: `${model.label} ${caption}`,
+  });
+
+  const y0 = yearsList[0].year;
+  const y1 = yearsList[yearsList.length - 1].year;
+  $('window-label').textContent = `${DATA.city.name} · ${model.label}, ${y0 === y1 ? y0 : `${y0}–${y1}`} overlaid`;
+  $('headline').innerHTML = buildYearlyHeadline(model, yearsList);
+  $('legend').innerHTML = yearsList
+    .map((yr, k) => `<span><span class="dot" style="background:${yearColor(k, yearsList.length)}"></span>${yr.year}</span>`)
+    .join('');
+  const direction = isError
+    ? 'a bright recent line riding above the dim older ones means recent degradation'
+    : 'a bright recent line sitting below the dim older ones means recent degradation';
+  $('caption').textContent = `${caption}, ${model.label} only. One line per calendar year over Jan–Dec (raw monthly values) — brighter = more recent, so ${direction}. Same calendar months line up vertically, which cancels the seasonal cycle without smoothing.`;
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────────
 function render() {
+  if (state.smooth === 'yearly') { renderYearly(); return; }
   const meta = VARS[state.variable];
   const isError = meta.kind === 'error';
 
@@ -224,8 +323,35 @@ function renderControls() {
     () => state.variable, (v) => { state.variable = v; onControlChange(); });
   buildTabs($('lead-tabs'), LEADS.map((v) => ({ value: v, label: v === 'all' ? 'All' : `D-${v}` })),
     () => state.lead, (v) => { state.lead = v; onControlChange(); });
-  buildTabs($('smooth-tabs'), [{ value: 'trend', label: 'Trend' }, { value: 'monthly', label: 'Monthly' }],
-    () => state.smooth, (v) => { state.smooth = v; onControlChange(); });
+  buildTabs($('smooth-tabs'), [
+    { value: 'trend', label: 'Trend' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'yearly', label: 'Yearly' },
+  ], () => state.smooth, (v) => { state.smooth = v; onControlChange(); });
+  $('model-ctl').hidden = state.smooth !== 'yearly';
+}
+
+// ── Model picker (Yearly view only) ────────────────────────────────────────────
+function populateModelSelect() {
+  const sel = $('model-select');
+  sel.innerHTML = '';
+  for (const m of DATA.models) {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = `${m.label} · ${m.provider}`;
+    sel.appendChild(opt);
+  }
+  // Keep the pick across city switches when the model exists there.
+  if (!DATA.models.some((m) => m.id === state.model)) state.model = defaultModelId();
+  sel.value = state.model;
+}
+
+function wireModelSelect() {
+  $('model-select').addEventListener('change', (e) => {
+    state.model = e.target.value;
+    if (DATA) render();
+    syncUrl();
+  });
 }
 
 // ── Units ──────────────────────────────────────────────────────────────────────
@@ -251,7 +377,7 @@ function wireUnitToggle() {
 // ── Boot ───────────────────────────────────────────────────────────────────────
 function monthLabel(ym) {
   const [y, m] = ym.split('-');
-  return `${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m) - 1]} ${y}`;
+  return `${MONTH_SHORT[Number(m) - 1]} ${y}`;
 }
 
 function applyStateFromUrl(params) {
@@ -261,7 +387,9 @@ function applyStateFromUrl(params) {
   if (lead === 'all') state.lead = 'all';
   else if (lead != null && LEADS.includes(Number(lead))) state.lead = Number(lead);
   const smooth = params.get('smooth');
-  if (smooth === 'trend' || smooth === 'monthly') state.smooth = smooth;
+  if (smooth === 'trend' || smooth === 'monthly' || smooth === 'yearly') state.smooth = smooth;
+  const m = params.get('m');
+  if (m) state.model = m; // validated against the city's roster once data loads
 }
 
 let currentCity = DEFAULT_CITY;
@@ -286,6 +414,7 @@ function syncUrl() {
   if (state.variable !== 'temperature') p.set('v', state.variable);
   if (state.lead !== 'all') p.set('lead', String(state.lead));
   if (state.smooth !== 'trend') p.set('smooth', state.smooth);
+  if (state.smooth === 'yearly' && state.model) p.set('m', state.model);
   const qs = p.toString();
   history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
 }
@@ -311,11 +440,13 @@ async function loadCity(cityId) {
 
   $('city-name').textContent = DATA.city.name;
   $('generated').textContent = DATA.generatedAt ? `baked ${DATA.generatedAt.slice(0, 10)} · ` : '';
+  populateModelSelect();
   render(); // sets #window-label to match the visible (clipped) span
 }
 
 function boot() {
   wireUnitToggle();
+  wireModelSelect();
   const params = new URLSearchParams(location.search);
   applyStateFromUrl(params);
   currentCity = params.get('city') || DEFAULT_CITY;

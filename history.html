@@ -14,6 +14,7 @@
     .back-link:hover { color: var(--text); }
     .trend-controls { display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem; align-items: center; }
     .trend-controls .ctl { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .trend-controls .ctl[hidden] { display: none; }
     .trend-controls .ctl-label { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
     .trend-headline { font-size: 0.95rem; color: var(--text); margin: 0.2rem 0 0.7rem; line-height: 1.5; }
     .trend-headline b { color: var(--text); }
@@ -22,6 +23,12 @@
     .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0.5rem 0 0; }
     .legend span { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: var(--text-2); }
     .legend .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    #model-select {
+      background: var(--surface); color: var(--text);
+      border: 1px solid var(--surface-light); border-radius: 6px;
+      padding: 0.15rem 0.4rem; font: inherit; font-size: 0.8rem;
+    }
+    #model-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   </style>
 </head>
 <body>
@@ -53,6 +60,8 @@
             <span class="lead-toggle" id="lead-tabs" role="group" aria-label="Lead time"></span></span>
           <span class="ctl"><span class="ctl-label">View</span>
             <span class="metric-tabs" id="smooth-tabs" role="group" aria-label="Smoothing"></span></span>
+          <span class="ctl" id="model-ctl" hidden><span class="ctl-label">Model</span>
+            <select id="model-select" aria-label="Model"></select></span>
         </div>
       </div>
       <p id="headline" class="trend-headline"></p>
@@ -86,6 +95,13 @@
               signal to score.</li>
             <li><b>Lead</b> picks the forecast horizon: <b>D-1</b> is "what it said 24 h ahead",
               up to <b>D-7</b>. <b>All</b> combines horizons (1/d-weighted).</li>
+            <li><b>View → Yearly</b> overlays one model's calendar years on a Jan–Dec axis
+              (pick the model in the control that appears). Brighter lines are more recent
+              years and the same months line up vertically, so "did the last year or two
+              slip?" — say, after an agency's budget cuts — reads directly off whether the
+              bright lines ride above the dim stack (for errors; below, for skill). The
+              headline compares the latest year to the same calendar months of all earlier
+              years, so a partial year is never judged against other years' winters.</li>
           </ul>
           <p>Two honest caveats. The <code>best_match</code> truth series' own composition can
             shift over the years, so a trend partly reflects the yardstick, not only the model.
