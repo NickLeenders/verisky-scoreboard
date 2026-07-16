@@ -45,6 +45,7 @@ import {
   HISTORY_CITIES,
   historyModelsFor,
   HISTORY_START_HINTS,
+  HISTORY_FLOOR_MONTH,
   monthRange,
   lastCompleteMonthYm,
   monthStartDate,
@@ -272,7 +273,8 @@ for (const city of cities) {
   // Per-model month lists (hint → last complete, or the --months override).
   const monthsFor = (model) => {
     if (ARGS.months) return monthRange(ARGS.months.from, ARGS.months.to);
-    const start = HISTORY_START_HINTS[model.id] ?? HISTORY_START_HINTS.default;
+    let start = HISTORY_START_HINTS[model.id] ?? HISTORY_START_HINTS.default;
+    if (start < HISTORY_FLOOR_MONTH) start = HISTORY_FLOOR_MONTH; // cap deep archives
     return monthRange(start, lastComplete);
   };
 

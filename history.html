@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VeriSky · Have the weather models degraded? Long-term model trends</title>
-  <meta name="description" content="Long-term accuracy trends for NOAA's weather models (GFS, AIGFS, NBM) at New York — verified forecast error over each model's full previous-runs archive, one month at a time, against the same observed series." />
+  <meta name="description" content="Long-term accuracy trends for the world's weather models (IFS, AIFS, GFS, ICON and regional models) across six cities — verified forecast error over each model's full previous-runs archive, one month at a time, against the same observed series." />
   <meta name="theme-color" content="#05080f" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%234c8dff'/%3E%3Cpath d='M4.5 8.5l2.5 2.5 4.5-5' stroke='%2305080f' stroke-width='2' fill='none'/%3E%3C/svg%3E" />
@@ -28,10 +28,13 @@
   <header class="topbar">
     <span class="brand">VeriSky <span class="brand-sub">trends</span></span>
     <a class="back-link" href="./">← scoreboard</a>
-    <div class="unit-toggle" id="unit-toggle" role="group" aria-label="Units"
-      title="Switch temperature and wind units">
-      <button type="button" data-units="metric" class="active" aria-pressed="true">°C</button>
-      <button type="button" data-units="imperial" aria-pressed="false">°F</button>
+    <div class="city-controls">
+      <select id="city-select" aria-label="City"></select>
+      <div class="unit-toggle" id="unit-toggle" role="group" aria-label="Units"
+        title="Switch temperature and wind units">
+        <button type="button" data-units="metric" class="active" aria-pressed="true">°C</button>
+        <button type="button" data-units="imperial" aria-pressed="false">°F</button>
+      </div>
     </div>
     <span class="window-wrap">
       <span id="window-label" class="window-label">loading…</span>
@@ -88,13 +91,15 @@
             shift over the years, so a trend partly reflects the yardstick, not only the model.
             And these are "seamless" products — a rising or falling line includes the model
             <b>upgrades</b> that happened over this period, which is exactly what a
-            "has it changed?" question is asking. Models with no independent previous-runs
-            archive at this location (HRRR duplicates GFS at short lead; NAM has none) are
-            omitted.</p>
+            "has it changed?" question is asking. HRRR is omitted because it duplicates GFS at
+            short lead (the seamless GFS product already uses it there) and has no longer-lead
+            archive.</p>
           <p>Data from Open-Meteo's
             <a href="https://open-meteo.com/en/docs/previous-runs-api">previous-runs</a> and
             <a href="https://open-meteo.com/en/docs/historical-forecast-api">historical-forecast</a>
-            APIs, baked offline. v1 covers NOAA's models at New York.</p>
+            APIs, baked offline. Covers every default scoreboard city with its full model roster;
+            each city's models reach back as far as that model's archive allows (GFS to 2021,
+            most others from 2024).</p>
         </div>
       </details>
       <p class="colophon">

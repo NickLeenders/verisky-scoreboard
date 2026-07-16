@@ -60,6 +60,26 @@ code { font-family: var(--mono); font-size: 0.92em; color: var(--text-2); }
 .brand { font-weight: 700; font-size: 1.05rem; letter-spacing: 0.01em; }
 .brand-sub { color: var(--accent); font-weight: 500; }
 
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-2);
+  text-decoration: none;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--surface-light);
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.nav-link svg { width: 18px; height: 11px; color: var(--accent); }
+.nav-link:hover, .nav-link:focus-visible {
+  color: var(--text);
+  border-color: var(--accent);
+  outline: none;
+}
+
 .city-controls { display: flex; gap: 0.5rem; align-items: center; }
 
 #city-select, #city-search {

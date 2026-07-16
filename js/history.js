@@ -8,10 +8,13 @@
  */
 
 import { trendChart } from './charts.js';
+import { HISTORY_CITIES } from './history-config.js';
 import {
   asTempDelta, asWind, tempUnit, windUnit,
   unitSystem, setUnitSystem,
 } from './units.js';
+
+const DEFAULT_CITY = 'newyork';
 
 const $ = (id) => document.getElementById(id);
 
@@ -119,6 +122,35 @@ function buildHeadline(seriesList) {
     + `${fmt(first)} → ${fmt(last)}${unit} from ${firstYear} to ${lastYear}.`;
 }
 
+/**
+ * Restrict the full-length month axis to the range [first, last] index that has
+ * any value (raw monthly or smoothed rolling) across the given series, and slice
+ * each series to match. Returns the trimmed months + series ready for trendChart.
+ * If nothing has data, returns empty arrays. Indices stay aligned because both
+ * `monthly` and `rolling` are built against DATA.months.
+ */
+function clipToData(seriesList) {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const s of seriesList) {
+    for (let i = 0; i < DATA.months.length; i++) {
+      if (s.monthly[i] != null || s.rolling[i] != null) {
+        if (i < lo) lo = i;
+        if (i > hi) hi = i;
+      }
+    }
+  }
+  if (lo > hi) return { months: [], view: [] };
+  return {
+    months: DATA.months.slice(lo, hi + 1),
+    view: seriesList.map((s) => ({
+      model: s.model,
+      monthly: s.monthly.slice(lo, hi + 1),
+      rolling: s.rolling.slice(lo, hi + 1),
+    })),
+  };
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────────
 function render() {
   const meta = VARS[state.variable];
@@ -131,14 +163,25 @@ function render() {
     return { model: m, monthly, rolling };
   });
 
+  // Trim the month axis to the span that actually holds data in THIS view, so the
+  // chart fills its plot instead of leaving empty years. Temperature reaches back
+  // to 2021, but Combined/Rain/Wind have no archive before ~2024 — without this the
+  // chart would draw a blank 2021–2023 gap on the left for those views.
+  const { months, view } = clipToData(seriesList);
+
   const unit = isError ? meta.unit() : '';
   const caption = isError ? `${meta.name} (${unit})` : meta.caption;
-  $('chart').innerHTML = trendChart(seriesList, DATA.months, {
+  $('chart').innerHTML = trendChart(view, months, {
     unit,
     ceil: isError ? null : 100,
     lowerBetter: isError,
     caption,
   });
+
+  // The header "window" label follows the visible span so it matches the chart.
+  $('window-label').textContent = months.length
+    ? `${DATA.city.name} · ${monthLabel(months[0])} – ${monthLabel(months[months.length - 1])}`
+    : `${DATA.city.name} · no data`;
 
   $('headline').innerHTML = buildHeadline(seriesList);
 
@@ -170,13 +213,19 @@ function buildTabs(host, items, getActive, onPick) {
   }
 }
 
+function onControlChange() {
+  renderControls();
+  if (DATA) render();
+  syncUrl();
+}
+
 function renderControls() {
   buildTabs($('var-tabs'), Object.entries(VARS).map(([value, v]) => ({ value, label: v.label })),
-    () => state.variable, (v) => { state.variable = v; renderControls(); render(); });
+    () => state.variable, (v) => { state.variable = v; onControlChange(); });
   buildTabs($('lead-tabs'), LEADS.map((v) => ({ value: v, label: v === 'all' ? 'All' : `D-${v}` })),
-    () => state.lead, (v) => { state.lead = v; renderControls(); render(); });
+    () => state.lead, (v) => { state.lead = v; onControlChange(); });
   buildTabs($('smooth-tabs'), [{ value: 'trend', label: 'Trend' }, { value: 'monthly', label: 'Monthly' }],
-    () => state.smooth, (v) => { state.smooth = v; renderControls(); render(); });
+    () => state.smooth, (v) => { state.smooth = v; onControlChange(); });
 }
 
 // ── Units ──────────────────────────────────────────────────────────────────────
@@ -215,30 +264,64 @@ function applyStateFromUrl(params) {
   if (smooth === 'trend' || smooth === 'monthly') state.smooth = smooth;
 }
 
-async function boot() {
-  wireUnitToggle();
-  const params = new URLSearchParams(location.search);
-  applyStateFromUrl(params);
-  const cityId = params.get('city') || 'newyork';
+let currentCity = DEFAULT_CITY;
+
+function populateCitySelect() {
+  const sel = $('city-select');
+  sel.innerHTML = '';
+  for (const c of HISTORY_CITIES) {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  }
+  sel.value = currentCity;
+  sel.addEventListener('change', () => { loadCity(sel.value); });
+}
+
+/** Reflect the current city + view state in the URL (shareable, no reload). */
+function syncUrl() {
+  const p = new URLSearchParams();
+  if (currentCity !== DEFAULT_CITY) p.set('city', currentCity);
+  if (state.variable !== 'temperature') p.set('v', state.variable);
+  if (state.lead !== 'all') p.set('lead', String(state.lead));
+  if (state.smooth !== 'trend') p.set('smooth', state.smooth);
+  const qs = p.toString();
+  history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
+}
+
+async function loadCity(cityId) {
+  currentCity = cityId;
+  $('city-select').value = cityId;
+  syncUrl();
   try {
     const res = await fetch(`data/history/${cityId}.json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     DATA = await res.json();
   } catch (err) {
+    DATA = null;
     $('chart').innerHTML = `<p class="empty">Long-term history isn't baked yet for this city. Run <code>node scripts/history-backfill.mjs</code> to generate <code>data/history/${cityId}.json</code>.</p>`;
+    $('headline').textContent = '';
+    $('legend').innerHTML = '';
+    $('caption').textContent = '';
+    $('city-name').textContent = DATA?.city?.name ?? '';
     $('window-label').textContent = 'no data';
     return;
   }
 
   $('city-name').textContent = DATA.city.name;
-  const first = DATA.months[0];
-  const last = DATA.months[DATA.months.length - 1];
-  $('window-label').textContent = `${DATA.city.name} · ${monthLabel(first)} – ${monthLabel(last)}`;
-  if (DATA.generatedAt) {
-    $('generated').textContent = `baked ${DATA.generatedAt.slice(0, 10)} · `;
-  }
+  $('generated').textContent = DATA.generatedAt ? `baked ${DATA.generatedAt.slice(0, 10)} · ` : '';
+  render(); // sets #window-label to match the visible (clipped) span
+}
+
+function boot() {
+  wireUnitToggle();
+  const params = new URLSearchParams(location.search);
+  applyStateFromUrl(params);
+  currentCity = params.get('city') || DEFAULT_CITY;
+  populateCitySelect();
   renderControls();
-  render();
+  loadCity(currentCity);
 }
 
 boot();

@@ -34,10 +34,11 @@ loading skeletons. The page works fine without it.
 ## Long-term trends (`history.html`)
 
 `history.html` charts how each model's error has moved over its **full**
-previous-runs archive (2.5+ years for GFS), one calendar month at a time — the
-"have the models degraded?" view. v1 covers NOAA's models at New York (GFS,
-AIGFS, NBM). It reads a small baked JSON and is generated separately from the
-daily bake:
+previous-runs archive (up to ~5 years for GFS), one calendar month at a time —
+the "have the models degraded?" view. It covers **every default city with its
+full model roster** (a city selector switches between them), each model reaching
+back as far as its archive allows. It reads a small baked JSON per city and is
+generated separately from the daily bake:
 
 ```sh
 node scripts/history-backfill.mjs                    # full backfill → data/history/newyork.json
@@ -56,16 +57,16 @@ How it works and how to maintain it:
   Complete months never change, so reruns are incremental and fully offline —
   the first full run is ~200 calls (well within Open-Meteo's free tier);
   later runs only fetch the newly-completed month.
-- Output `data/history/newyork.json` **is committed** (the `data/` dir is
-  otherwise gitignored; `.gitignore` carves out `data/history`). GitHub Pages
-  ships it as-is, so the daily CI bake is untouched.
+- Output `data/history/<city>.json` (one per city) **is committed** (the `data/`
+  dir is otherwise gitignored; `.gitignore` carves out `data/history`). GitHub
+  Pages ships them as-is, so the daily CI bake is untouched.
 - **To refresh:** run the full command on/after the 2nd of a new month and
-  commit the updated JSON. That's the only maintenance step.
+  commit the updated JSON files. That's the only maintenance step.
 
-Model selection is `resolveRoster(city)` filtered to NOAA
-(`js/history-config.js`); models with no independent previous-runs archive at
-the location are dropped (HRRR duplicates GFS at short lead; NAM has no archive
-at NYC).
+Model selection is the city's live `resolveRoster(city)` (`js/history-config.js`);
+per-model archive starts live in `HISTORY_START_HINTS`, clamped to
+`HISTORY_FLOOR_MONTH` (2021). Models with no data at a location are dropped
+automatically; HRRR is excluded structurally (it duplicates GFS at short lead).
 
 ### URL parameters
 
