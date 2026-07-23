@@ -3,7 +3,8 @@
 A static web scoreboard that ranks public and commercial weather models by how
 accurate their forecasts turned out to be over the last 30 days. Public-model
 data comes from Open-Meteo; preset cities add server-computed aggregate scores
-for Apple Weather, OpenWeatherMap, WeatherAPI, and Visual Crossing. There's no
+for Apple Weather, OpenWeatherMap, WeatherAPI, Visual Crossing, and Foreca.
+There's no
 build step or framework, just ES modules and plain HTML and CSS.
 
 ## Running it

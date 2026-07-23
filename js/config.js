@@ -97,6 +97,7 @@ export const COMMERCIAL_MODEL_CATALOG = /** @type {ModelConfig[]} */ ([
   { id: 'openweathermap', label: 'OpenWeather', provider: 'OpenWeatherMap', color: '#F59E0B', maxLeadDays: 7 },
   { id: 'weatherapi', label: 'WeatherAPI', provider: 'WeatherAPI.com', color: '#06B6D4', maxLeadDays: 3 },
   { id: 'visualcrossing', label: 'VisualCross', provider: 'Visual Crossing', color: '#10B981', maxLeadDays: 7 },
+  { id: 'foreca', label: 'Foreca', provider: 'Foreca', color: '#8B5CF6', maxLeadDays: 7 },
 ]);
 
 const SCOREBOARD_MODEL_BY_ID = new Map(
