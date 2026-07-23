@@ -205,6 +205,8 @@ tr.standing { cursor: pointer; }
 tr.standing:hover td { background: rgba(76, 141, 255, 0.05); }
 tr.standing[aria-expanded="true"] td { background: var(--surface); }
 tr.standing:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+tr.standing.standing-static { cursor: default; }
+tr.standing.standing-static:hover td { background: transparent; }
 tr.standing + .lab-row td { padding: 0; }
 
 .c-rank { width: 1.6rem; color: var(--text-2); }

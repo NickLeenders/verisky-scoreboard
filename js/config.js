@@ -1,12 +1,12 @@
 /**
  * Static configuration for the VeriSky scoreboard (plan.md §1 + §1a).
  *
- * The full model catalog mirrors the app's non-commercial models
+ * The public model catalog mirrors the app's non-commercial models
  * (constants/models.ts), translated to the ids the Open-Meteo previous-runs API
  * serves, with labels/providers/colors copied so the web scoreboard and the app
- * read as one product. Commercial (Cloudflare-cached) models are omitted — they
- * are not on the previous-runs archive, so they can't be verified against the
- * same past-run truth (plan.md §1a).
+ * read as one product. Commercial models never enter the browser-side fetch /
+ * align pipeline: preset cities receive only their server-computed aggregate
+ * scores from api.verisky.app, with no forecast values in the response.
  *
  * We don't show all models for every city (§1a): `resolveRoster(city)` returns a
  * 5-model global spine plus that country's home models and very-near neighbours.
@@ -85,6 +85,28 @@ export const MODEL_CATALOG = /** @type {ModelConfig[]} */ ([
 ]);
 
 const MODEL_BY_ID = new Map(MODEL_CATALOG.map((m) => [m.id, m]));
+
+/**
+ * Commercial models available only in the preset-city server scoreboard.
+ * AccuWeather is deliberately absent. These entries are presentation metadata;
+ * their predictions and provider credentials never enter this repository's
+ * browser-side scoring pipeline or baked raw payloads.
+ */
+export const COMMERCIAL_MODEL_CATALOG = /** @type {ModelConfig[]} */ ([
+  { id: 'apple_weatherkit', label: 'Apple Weather', provider: 'Apple Weather', color: '#9CA3AF', maxLeadDays: 7 },
+  { id: 'openweathermap', label: 'OpenWeather', provider: 'OpenWeatherMap', color: '#F59E0B', maxLeadDays: 7 },
+  { id: 'weatherapi', label: 'WeatherAPI', provider: 'WeatherAPI.com', color: '#06B6D4', maxLeadDays: 3 },
+  { id: 'visualcrossing', label: 'VisualCross', provider: 'Visual Crossing', color: '#10B981', maxLeadDays: 7 },
+]);
+
+const SCOREBOARD_MODEL_BY_ID = new Map(
+  [...MODEL_CATALOG, ...COMMERCIAL_MODEL_CATALOG].map((m) => [m.id, m]),
+);
+
+/** Presentation metadata for a model returned by the sanitized server board. */
+export function scoreboardModelById(id) {
+  return SCOREBOARD_MODEL_BY_ID.get(id) ?? null;
+}
 
 /** The five global models shown for every city, in ranking-order priority. */
 export const SPINE_IDS = [

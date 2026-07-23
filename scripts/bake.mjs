@@ -32,6 +32,7 @@ import { CITIES, DEFAULT_CITY_ID, WINDOW_PAST_DAYS } from '../js/config.js';
 import { fetchCityData } from '../js/fetch.js';
 import { scorePayload } from '../js/pipeline.js';
 import { buildStandings, scoreTone } from '../js/derive.js';
+import { fetchPresetScoreboard } from '../js/server-scoreboard.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = join(ROOT, 'data');
@@ -166,11 +167,18 @@ const summary = {
 };
 
 const results = await pool(CITIES, CITY_CONCURRENCY, async (city) => {
-  const { truth, predictions } = FROM_CACHE
-    ? JSON.parse(await readFile(join(DATA_DIR, `${city.id}.json`), 'utf8'))
-    : await fetchCityData(city);
+  const [publicPayload, presetBoard] = await Promise.all([
+    FROM_CACHE
+      ? JSON.parse(await readFile(join(DATA_DIR, `${city.id}.json`), 'utf8'))
+      : fetchCityData(city),
+    fetchPresetScoreboard(city).catch((error) => {
+      console.warn(`  ! ${city.name}: preset scoreboard unavailable (${error.message})`);
+      return null;
+    }),
+  ]);
+  const { truth, predictions } = publicPayload;
   const { aligned, scores, timezone } = scorePayload(city, { truth, predictions });
-  return { city, truth, predictions, aligned, scores, timezone };
+  return { city, truth, predictions, aligned, scores, timezone, presetBoard };
 });
 
 let ok = 0;
@@ -185,7 +193,7 @@ for (let i = 0; i < CITIES.length; i++) {
     continue;
   }
   ok += 1;
-  const { truth, predictions, aligned, scores, timezone } = r.value;
+  const { truth, predictions, aligned, scores, timezone, presetBoard } = r.value;
 
   // 1. Raw payload — the app replays this exactly like a cache hit.
   //    Skipped in from-cache mode: we're reading these, not refreshing them.
@@ -197,19 +205,22 @@ for (let i = 0; i < CITIES.length; i++) {
   }
 
   // 2. Summary rows (the same buildStandings the browser renders).
-  const rows = buildStandings(aligned, scores);
+  const rows = presetBoard?.rows ?? buildStandings(aligned, scores);
   const dates = aligned.scoredDates;
-  const rainOff = !scores.rainEligibility.rainScoreEligible;
-  perCity[city.id] = { rows, scoredDays: dates.length, rainOff };
+  const scoredDays = presetBoard?.scoredDays ?? dates.length;
+  const dateRange = presetBoard?.dateRange
+    ?? (dates.length ? [dates[0], dates[dates.length - 1]] : null);
+  const rainOff = !(presetBoard?.scores ?? scores).rainEligibility.rainScoreEligible;
+  perCity[city.id] = { rows, scoredDays, rainOff };
 
   summary.cities[city.id] = {
     name: city.name,
     country: city.country ?? null,
-    timezone,
-    scoredDays: dates.length,
-    dateRange: dates.length ? [dates[0], dates[dates.length - 1]] : null,
+    timezone: presetBoard?.timezone ?? timezone,
+    scoredDays,
+    dateRange,
     rainScored: !rainOff,
-    headline: headlineFor(city.name, dates.length, rows),
+    headline: headlineFor(city.name, scoredDays, rows),
     standings: rows.map((row) => ({
       rank: row.rank,
       model: {
@@ -228,7 +239,7 @@ for (let i = 0; i < CITIES.length; i++) {
     })),
   };
   console.log(
-    `  ✓ ${city.name}: ${dates.length} days, ${rows.length} models, leader ${rows[0]?.model.label ?? '—'} ${fmt(rows[0]?.skill)}`,
+    `  ✓ ${city.name}: ${scoredDays} days, ${rows.length} models, leader ${rows[0]?.model.label ?? '—'} ${fmt(rows[0]?.skill)}`,
   );
 }
 

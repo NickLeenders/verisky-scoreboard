@@ -1,9 +1,10 @@
 # VeriSky Scoreboard
 
-A static web scoreboard that ranks weather models (IFS, AIFS, GFS, ICON) by how
-accurate their forecasts turned out to be over the last 30 days. All data comes
-from Open-Meteo. There's no build step, no server, and no framework, just ES
-modules and plain HTML and CSS.
+A static web scoreboard that ranks public and commercial weather models by how
+accurate their forecasts turned out to be over the last 30 days. Public-model
+data comes from Open-Meteo; preset cities add server-computed aggregate scores
+for Apple Weather, OpenWeatherMap, WeatherAPI, and Visual Crossing. There's no
+build step or framework, just ES modules and plain HTML and CSS.
 
 ## Running it
 
@@ -18,7 +19,9 @@ Then open http://localhost:8000.
 
 On a cold start the page fetches from Open-Meteo and scores everything in the
 browser, so give it a moment. Results are cached in localStorage for about six
-hours, so reloads are instant.
+hours, so reloads are instant. For the six preset cities it also reads a small
+aggregate-only scoreboard from `api.verisky.app`; custom locations remain
+public-model-only.
 
 You can also run the scoring outside the browser with Node 18+:
 
@@ -30,6 +33,16 @@ node scripts/bake.mjs              # score all preset cities, write data/*.json
 `bake.mjs` is optional. It precomputes the standings into `data/` and injects
 them into `index.html` so a fresh visit shows real numbers right away instead of
 loading skeletons. The page works fine without it.
+
+### Commercial score boundary
+
+The browser never receives commercial forecast values or credentials.
+`/scoreboard/v1/<preset>.json` accepts only the six compiled-in city slugs and
+returns stored aggregate scores (standings, form, rain record, and per-lead
+skill). It accepts no coordinates, model ids, provider ids, or run selectors,
+does not trigger a score refresh or provider request, and excludes AccuWeather.
+Commercial models are consequently absent from the raw-call receipt and
+forecast-vs-observed lab views.
 
 ## Long-term trends (`history.html`)
 

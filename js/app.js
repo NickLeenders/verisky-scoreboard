@@ -15,6 +15,7 @@ import { fetchCityData } from './fetch.js';
 import { scorePayload } from './pipeline.js';
 import { readCache, writeCache } from './cache.js';
 import { readBaked } from './prebaked.js';
+import { fetchPresetScoreboard } from './server-scoreboard.js';
 import {
   scoreTone,
   buildStandings,
@@ -95,13 +96,35 @@ async function loadCity(city) {
   syncSelector(city);
   setStatus('loading');
 
+  // Preset commercial scores come from a fixed-slug, aggregate-only endpoint.
+  // Fetch them alongside the public data: this is a stored-snapshot DB read,
+  // never a commercial-provider request or a scoring refresh.
+  let presetBoard = null;
+  let paintedResult = null;
+  const paint = (result) => {
+    paintedResult = result;
+    render(city, { ...result, presetBoard });
+  };
+  const presetBoardPromise = fetchPresetScoreboard(city)
+    .then((board) => {
+      if (token !== loadToken || !board) return;
+      presetBoard = board;
+      if (paintedResult) paint(paintedResult);
+    })
+    .catch((error) => {
+      // Public-model scoring remains useful if the optional server projection
+      // is unavailable. Keep the failure visible to operators, not visitors.
+      console.warn('Preset scoreboard unavailable:', error.message);
+    });
+
   let seeded = false; // did cache or a baked snapshot already paint real numbers?
   const cached = readCache(city);
   if (cached) {
-    render(city, scorePayload(city, cached.payload));
+    paint(scorePayload(city, cached.payload));
     seeded = true;
     if (cached.fresh) {
       setStatus('fresh-cache');
+      await presetBoardPromise;
       return;
     }
     setStatus('refreshing');
@@ -113,7 +136,7 @@ async function loadCity(city) {
     const baked = await readBaked(city);
     if (token !== loadToken) return;
     if (baked) {
-      render(city, scorePayload(city, baked));
+      paint(scorePayload(city, baked));
       seeded = true;
       setStatus('baked');
     } else {
@@ -125,7 +148,7 @@ async function loadCity(city) {
     const { truth, predictions } = await fetchCityData(city);
     if (token !== loadToken) return; // user switched city mid-flight
     writeCache(city, { truth, predictions });
-    render(city, scorePayload(city, { truth, predictions }));
+    paint(scorePayload(city, { truth, predictions }));
     setStatus('live');
   } catch (error) {
     if (token !== loadToken) return;
@@ -170,14 +193,16 @@ function renderError(error) {
   $('#calls-body').innerHTML = '';
 }
 
-function render(city, { aligned, scores, timezone }) {
-  lastRender = { city, aligned, scores, timezone };
+function render(city, { aligned, scores, timezone, presetBoard = null }) {
+  lastRender = { city, aligned, scores, timezone, presetBoard };
   const dates = aligned.scoredDates;
+  const shownDays = presetBoard?.scoredDays ?? dates.length;
+  const shownTimezone = presetBoard?.timezone ?? timezone;
   $('#window-label').textContent =
-    `last ${dates.length} days · all lead days · ${timezone}`;
+    `last ${shownDays} days · all lead days · ${shownTimezone}`;
 
   // Page order per §6/§8: standings first…
-  renderStandings(aligned, scores);
+  renderStandings(aligned, scores, presetBoard);
   if (pendingLab) {
     const tr = document.querySelector(`tr.standing[data-model="${CSS.escape(pendingLab)}"]`);
     pendingLab = null;
@@ -185,9 +210,9 @@ function render(city, { aligned, scores, timezone }) {
   }
   // …then charts on the next frame so the table paints immediately.
   requestAnimationFrame(() => {
-    renderReceipt(aligned);
-    renderLead(scores);
-    renderCalls(aligned, scores);
+    renderReceipt(aligned, presetBoard != null);
+    renderLead(presetBoard?.scores ?? scores);
+    renderCalls(aligned, scores, presetBoard != null);
   });
 }
 
@@ -200,9 +225,10 @@ function rerender() {
 
 // ── Standings table ──────────────────────────────────────────────────────────
 
-function renderStandings(aligned, scores) {
-  const rows = buildStandings(aligned, scores);
-  const rainOff = !scores.rainEligibility.rainScoreEligible;
+function renderStandings(aligned, scores, presetBoard) {
+  const rows = presetBoard?.rows ?? buildStandings(aligned, scores);
+  const shownScores = presetBoard?.scores ?? scores;
+  const rainOff = !shownScores.rainEligibility.rainScoreEligible;
 
   const html = [`<table class="standings"><thead><tr>
     <th class="c-rank">#</th><th class="c-move" title="movement vs the standings a week ago (same window minus its last 7 days)"></th>
@@ -213,6 +239,8 @@ function renderStandings(aligned, scores) {
   </tr></thead><tbody>`];
 
   for (const r of rows) {
+    const canOpenLab = Object.values(aligned.pairs[r.model.id] ?? {})
+      .some((pairs) => Array.isArray(pairs) && pairs.length > 0);
     const move =
       r.movement == null ? '<span class="move move-flat">—</span>'
         : r.movement > 0 ? `<span class="move move-up">▲${r.movement > 1 ? r.movement : ''}</span>`
@@ -223,8 +251,10 @@ function renderStandings(aligned, scores) {
       .join('');
     const metric = (v) =>
       `<td class="num c-metric tone-${scoreTone(v)}">${fmt(v)}</td>`;
-    html.push(`<tr class="standing" data-model="${esc(r.model.id)}" tabindex="0" role="button"
-        aria-expanded="false" title="click to open the lab">
+    html.push(`<tr class="standing${canOpenLab ? '' : ' standing-static'}" data-model="${esc(r.model.id)}"
+        data-lab="${canOpenLab ? '1' : '0'}"${canOpenLab
+          ? ' tabindex="0" role="button" aria-expanded="false" title="click to open the lab"'
+          : ''}>
       <td class="c-rank num">${r.rank}</td>
       <td class="c-move">${move}</td>
       <td class="c-model"><span class="mdot" style="background:${esc(r.model.color)}"></span>
@@ -234,20 +264,21 @@ function renderStandings(aligned, scores) {
       ${metric(r.metricSkill.temperature)}${metric(r.metricSkill.rain)}${metric(r.metricSkill.wind)}
       <td class="num c-record">${r.rainRecord.wins}–${r.rainRecord.losses}</td>
       <td class="c-form">${dots}</td>
-    </tr>
-    <tr class="lab-row" data-model="${esc(r.model.id)}" hidden><td colspan="9"><div class="lab"></div></td></tr>`);
+    </tr>${canOpenLab
+      ? `\n    <tr class="lab-row" data-model="${esc(r.model.id)}" hidden><td colspan="9"><div class="lab"></div></td></tr>`
+      : ''}`);
   }
   html.push('</tbody></table>');
   if (rainOff) {
     html.push(
       `<p class="foot-note">* rain not scored: the window was too dry for rain calls to mean anything ` +
-      `(${scores.rainEligibility.rainEventHours} rain-event hours, ${fmtRain(scores.rainEligibility.rainEventTotalMm)} ${rainUnit()}).</p>`,
+      `(${shownScores.rainEligibility.rainEventHours} rain-event hours, ${fmtRain(shownScores.rainEligibility.rainEventTotalMm)} ${rainUnit()}).</p>`,
     );
   }
   const container = $('#standings-body');
   container.innerHTML = html.join('');
 
-  for (const tr of container.querySelectorAll('tr.standing')) {
+  for (const tr of container.querySelectorAll('tr.standing[data-lab="1"]')) {
     const toggle = () => toggleLab(tr);
     tr.addEventListener('click', toggle);
     tr.addEventListener('keydown', (e) => {
@@ -346,7 +377,7 @@ const RECEIPT_TABS = [
   ['wind', 'Wind'],
 ];
 
-function renderReceipt(aligned) {
+function renderReceipt(aligned, hasCommercialStandings = false) {
   const container = $('#receipt-body');
   const receipt = buildReceipt(aligned);
   if (!receipt) {
@@ -390,7 +421,8 @@ function renderReceipt(aligned) {
       });
       capEl.innerHTML =
         `bars = hours each model called rain · <span class="key key-obs"></span> band = when it actually rained · ` +
-        `brightest = best timing · ${rainUnit()} totals at right`;
+        `brightest = best timing · ${rainUnit()} totals at right` +
+        (hasCommercialStandings ? ' · raw-call view intentionally excludes commercial providers' : '');
       gridEl.innerHTML = view.models
         .map(
           (c, i) => `<div class="call ${c.correct ? 'call-win' : 'call-loss'}${i === 0 ? '' : ' call-dim'}">
@@ -420,7 +452,8 @@ function renderReceipt(aligned) {
       chartEl.innerHTML = receiptLineChart(cview, receipt.hours, isTemp ? '°' : '');
       capEl.innerHTML =
         `hourly D-1 forecasts vs observed · brightest line = closest model · ` +
-        `<span class="key key-obs"></span> observed · ± = mean hourly error, signed = bias`;
+        `<span class="key key-obs"></span> observed · ± = mean hourly error, signed = bias` +
+        (hasCommercialStandings ? ' · raw-call view intentionally excludes commercial providers' : '');
       gridEl.innerHTML = view.models
         .map(
           (c, i) => `<div class="call${i === 0 ? '' : ' call-dim'}">
@@ -493,7 +526,7 @@ function renderLead(scores) {
 
 // ── Other-calls strip ────────────────────────────────────────────────────────
 
-function renderCalls(aligned, scores) {
+function renderCalls(aligned, scores, hasCommercialStandings = false) {
   const container = $('#calls-body');
   const calls = buildOtherCalls(aligned, scores);
   if (!calls) {
@@ -525,7 +558,7 @@ function renderCalls(aligned, scores) {
     );
   }
   container.innerHTML = bits.length
-    ? `<span class="call-date">yesterday's other calls</span> ${bits.join('<span class="call-sep">·</span>')}`
+    ? `<span class="call-date">yesterday's ${hasCommercialStandings ? 'public-model ' : ''}other calls</span> ${bits.join('<span class="call-sep">·</span>')}`
     : '';
 }
 

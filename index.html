@@ -230,19 +230,23 @@
             call at 0.1&nbsp;mm; a form dot fills when that day's next-day skill ≥ 70.
             The ▲▼ movement column compares today's ranking with the same table computed
             a week ago (the window minus its last 7 days).</p>
-          <p>Forecasts come from Open-Meteo's
+          <p>Public-model forecasts come from Open-Meteo's
             <a href="https://open-meteo.com/en/docs/previous-runs-api">previous runs archive</a>
             (what each model actually said 1 to 7 days earlier); observations from its
             <code>best_match</code> ground-truth series. The most recent (incomplete) day is
-            always excluded. Data is cached locally for ~6 hours.</p>
+            always excluded. Preset cities add aggregate-only stored scores for commercial
+            providers; their forecast values never reach this page. Data is cached locally
+            for ~6 hours.</p>
         </div>
       </details>
       <p class="colophon">
-        static + serverless, scored daily in CI and re-scored live in your browser ·
+        static front end, public models scored daily in CI and re-scored live in your browser ·
         <!-- BAKE:GENERATED --> baked 2026-07-07 16:11 UTC · <!-- /BAKE:GENERATED -->
         <a href="history.html">long-term model trends</a> ·
         <a href="https://github.com/NickLeenders/verisky-scoreboard">source</a> · data by
-        <a href="https://open-meteo.com/">Open-Meteo</a> (CC-BY 4.0)
+        <a href="https://open-meteo.com/">Open-Meteo</a> (CC-BY 4.0),
+        <a href="https://developer.apple.com/weatherkit/data-source-attribution/">Apple Weather</a>,
+        OpenWeatherMap, WeatherAPI, and Visual Crossing
       </p>
     </footer>
   </main>
