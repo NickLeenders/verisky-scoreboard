@@ -134,6 +134,10 @@ export const COUNTRY_ADDONS = {
   KR: ['kma_seamless', 'jma_seamless', 'cma_grapes_global'],
   CN: ['cma_grapes_global', 'jma_seamless', 'kma_seamless'],
   TW: ['cma_grapes_global', 'jma_seamless', 'kma_seamless'],
+  // Southeast Asia — no home model in the catalog; JMA/CMA/UKMO are the
+  // nearest globals that carry data there (none of the three is bounds-gated,
+  // so the pipeline self-filters if that ever stops being true).
+  TH: ['jma_seamless', 'cma_grapes_global', 'ukmo_seamless'],
   // Western Europe
   GB: ['ukmo_seamless', 'meteofrance_seamless', 'knmi_seamless'],
   IE: ['ukmo_seamless', 'meteofrance_seamless', 'knmi_seamless'],
@@ -186,13 +190,36 @@ export function resolveRoster(city) {
   return out;
 }
 
+/**
+ * The preset cities, grouped by region and ordered as the picker shows them.
+ *
+ * Coordinates must match `PUBLIC_SCOREBOARD_PRESETS` on the server (scorer's
+ * `publicScoreboard.ts`) city-for-city, because they snap to the 0.1° cell the
+ * server has commercial scores for — nudging a coordinate here can move the
+ * cell and drop the whole commercial half of the board.
+ *
+ * Adding a city here also enrolls it in `history.html` (HISTORY_CITY_IDS is
+ * derived from this list). Until `scripts/history-backfill.mjs` has baked
+ * `data/history/<id>.json`, that page shows its "not baked yet" notice for the
+ * new city — the live board is unaffected.
+ */
 export const CITIES = [
+  // Europe
   { id: 'amsterdam', name: 'Amsterdam', lat: 52.37, lon: 4.89, country: 'NL' },
   { id: 'london', name: 'London', lat: 51.51, lon: -0.13, country: 'GB' },
   { id: 'berlin', name: 'Berlin', lat: 52.52, lon: 13.41, country: 'DE' },
   { id: 'paris', name: 'Paris', lat: 48.86, lon: 2.35, country: 'FR' },
+  { id: 'vienna', name: 'Vienna', lat: 48.21, lon: 16.37, country: 'AT' },
+  // North America
   { id: 'newyork', name: 'New York', lat: 40.71, lon: -74.01, country: 'US' },
+  { id: 'chicago', name: 'Chicago', lat: 41.98, lon: -87.90, country: 'US' },
+  { id: 'toronto', name: 'Toronto', lat: 43.66, lon: -79.38, country: 'CA' },
+  { id: 'vancouver', name: 'Vancouver', lat: 49.28, lon: -123.12, country: 'CA' },
+  { id: 'mexicocity', name: 'Mexico City', lat: 19.43, lon: -99.13, country: 'MX' },
+  // Asia-Pacific
   { id: 'tokyo', name: 'Tokyo', lat: 35.68, lon: 139.69, country: 'JP' },
+  { id: 'bangkok', name: 'Bangkok', lat: 13.74, lon: 100.52, country: 'TH' },
+  { id: 'sydney', name: 'Sydney', lat: -33.87, lon: 151.21, country: 'AU' },
 ];
 
 export const DEFAULT_CITY_ID = 'amsterdam';
