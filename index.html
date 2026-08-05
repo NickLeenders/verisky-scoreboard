@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VeriSky Scoreboard: which weather model actually gets it right?</title>
   <!-- BAKE:META -->
-  <meta name="description" content="Which weather model is most accurate in Amsterdam? HARM leads at 58/100 over the last 30 days — IFS, AIFS, GFS and ICON scored against the same observed series (temp, rain, wind, every lead time)." />
+  <meta name="description" content="Which weather model is most accurate in Amsterdam? HARM leads at 58/100 over the last 30 days — IFS, AIFS, GFS and ICON scored against the same reference series (temp, rain, wind, every lead time)." />
   <!-- /BAKE:META -->
   <meta name="theme-color" content="#05080f" />
   <link rel="stylesheet" href="css/style.css" />
@@ -195,9 +195,14 @@
 
     <footer class="methodology">
       <p class="method-lede">
-        Every model is verified against the <b>same observed series</b>
-        (Open-Meteo <code>best_match</code>), never against its own day-0 analysis,
-        so no model grades its own homework.
+        Every model is verified against the <b>same reference series</b>:
+        Open-Meteo <code>best_match</code> over the past 30 days. For hours that
+        have already happened this is the highest-resolution model available at
+        the location at lead zero, just after it has ingested real observations
+        (stations, radar, satellite). In other words a model reconstruction of
+        the observed weather on a grid, not raw station readings, which is also
+        how forecast centres verify their own models (verification against
+        analysis).
       </p>
       <details>
         <summary>How scoring works</summary>
@@ -232,8 +237,15 @@
             a week ago (the window minus its last 7 days).</p>
           <p>Public-model forecasts come from Open-Meteo's
             <a href="https://open-meteo.com/en/docs/previous-runs-api">previous runs archive</a>
-            (what each model actually said 1 to 7 days earlier); observations from its
-            <code>best_match</code> ground-truth series. The most recent (incomplete) day is
+            (what each model actually said 1 to 7 days earlier). The reference series is
+            <a href="https://open-meteo.com/en/docs"><code>best_match</code></a> with
+            <code>past_days=30</code>: Open-Meteo picks the single highest-resolution
+            model for the location (see "Data Sources" in their docs), and for past
+            hours serves that model's most recent, observation-fed runs. It is one
+            consistent series per location, not an agglomeration of forecasts, but it
+            is an analysis rather than a station record, so at short leads it can
+            slightly flatter models related to the one that provides it. The most
+            recent (incomplete) day is
             always excluded. Preset cities add aggregate-only stored scores for commercial
             providers; their forecast values never reach this page. Data is cached locally
             for ~6 hours.</p>

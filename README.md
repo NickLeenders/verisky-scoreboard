@@ -92,8 +92,11 @@ automatically; HRRR is excluded structurally (it duplicates GFS at short lead).
 
 ## Notes on the scoring
 
-- Every model is checked against the same observed series (`best_match`), never
-  against its own analysis.
+- Every model is checked against the same reference series: `best_match` with
+  `past_days`. For past hours this is the highest-resolution model at the
+  location at lead zero, i.e. an observation-fed analysis (a model
+  reconstruction of the observed weather), not raw station readings. The
+  methodology footer on the page spells out the caveats.
 - The headline number weights the nearer lead days more heavily (1/day), then
   scales by how many days the model actually covers. A short-range model can
   still score well at day 1–2, while longer-range models get credit for covering
