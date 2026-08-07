@@ -14,19 +14,23 @@
  * bake is an optimization, never a dependency.
  */
 
+import { siteSlug } from './config.js';
+
 /** Relative to the page (index.html and data/ are both at the site root). */
 const BAKED_BASE = 'data';
 
 /**
- * The server-baked raw payload for a city, or null if there is none (custom
- * city, not yet baked, offline, or a malformed file).
- * @param {{id?:string|null}} city
+ * The server-baked raw payload for a city (or its `<id>-airport` variant), or
+ * null if there is none (custom city, not yet baked, offline, or a malformed
+ * file).
+ * @param {{id?:string|null, site?:string}} city
  * @returns {Promise<{truth:Object, predictions:Object}|null>}
  */
 export async function readBaked(city) {
-  if (!city || !city.id) return null;
+  const slug = siteSlug(city);
+  if (!slug) return null;
   try {
-    const res = await fetch(`${BAKED_BASE}/${encodeURIComponent(city.id)}.json`, {
+    const res = await fetch(`${BAKED_BASE}/${encodeURIComponent(slug)}.json`, {
       headers: { accept: 'application/json' },
     });
     if (!res.ok) return null;

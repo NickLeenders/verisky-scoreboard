@@ -6,7 +6,7 @@
  * values therefore never enter the browser, localStorage, or the static bake.
  */
 
-import { scoreboardModelById } from './config.js';
+import { scoreboardModelById, siteSlug } from './config.js';
 
 const SCOREBOARD_BASE = 'https://api.verisky.app/scoreboard/v1';
 const RESPONSE_VERSION = 1;
@@ -90,6 +90,10 @@ export function hydratePresetScoreboard(payload, expectedCityId) {
 
   return {
     city: payload.city,
+    // Airport boards only: the METAR weather station behind the board's cell.
+    station: payload.station && typeof payload.station.icao === 'string'
+      ? { icao: payload.station.icao, name: String(payload.station.name ?? payload.station.icao) }
+      : null,
     asOf: payload.asOf,
     computedAt: payload.computedAt,
     lookbackDays: payload.lookbackDays,
@@ -109,13 +113,15 @@ export function hydratePresetScoreboard(payload, expectedCityId) {
   };
 }
 
-/** Fetch aggregate scores for a preset. Custom locations deliberately return null. */
+/** Fetch aggregate scores for a preset (city or its `<id>-airport` variant).
+ *  Custom locations deliberately return null. */
 export async function fetchPresetScoreboard(city) {
-  if (!city?.id) return null;
-  const url = `${SCOREBOARD_BASE}/${encodeURIComponent(city.id)}.json`;
+  const slug = siteSlug(city);
+  if (!slug) return null;
+  const url = `${SCOREBOARD_BASE}/${encodeURIComponent(slug)}.json`;
   const response = await fetch(url, { headers: { accept: 'application/json' } });
   if (!response.ok) {
     throw new Error(`Preset scoreboard request failed (HTTP ${response.status})`);
   }
-  return hydratePresetScoreboard(await response.json(), city.id);
+  return hydratePresetScoreboard(await response.json(), slug);
 }

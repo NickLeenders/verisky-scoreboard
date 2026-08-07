@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VeriSky Scoreboard: which weather model actually gets it right?</title>
   <!-- BAKE:META -->
-  <meta name="description" content="Which weather model is most accurate in Amsterdam? HARM leads at 58/100 over the last 30 days — IFS, AIFS, GFS and ICON scored against the same reference series (temp, rain, wind, every lead time)." />
+  <meta name="description" content="Which weather model is most accurate in Amsterdam? HARM leads at 73/100 over the last 30 days — IFS, AIFS, GFS and ICON scored against the same observed series (temp, rain, wind, every lead time)." />
   <!-- /BAKE:META -->
   <meta name="theme-color" content="#05080f" />
   <link rel="stylesheet" href="css/style.css" />
@@ -20,6 +20,11 @@
     </a>
     <div class="city-controls">
       <select id="city-select" aria-label="City"></select>
+      <div class="site-toggle" id="site-toggle" role="group" aria-label="Measurement site" hidden
+        title="Score the models at the city itself, or at its airport's METAR weather station">
+        <button type="button" data-site="city" class="active" aria-pressed="true">City</button>
+        <button type="button" data-site="airport" aria-pressed="false"><span aria-hidden="true">✈</span> Airport</button>
+      </div>
       <span class="search-wrap">
         <input id="city-search" type="search" placeholder="your city…" autocomplete="off"
           aria-label="Search any city" />
@@ -38,102 +43,159 @@
   </header>
 
   <main>
+    <aside class="site-banner" id="site-banner" hidden></aside>
+
     <section class="card" id="standings" aria-label="Model standings">
       <div id="standings-body" class="card-body">
         <!-- BAKE:STANDINGS -->
         <table class="standings"><thead><tr>
     <th class="c-rank">#</th><th class="c-move"></th>
     <th>Model</th><th class="c-skill">Skill</th>
-    <th class="c-metric">Temp</th><th class="c-metric">Rain</th><th class="c-metric">Wind</th>
+    <th class="c-metric">Temp</th><th class="c-metric">Rain*</th><th class="c-metric">Wind</th>
     <th class="c-record">Rain W–L</th><th class="c-form">Form</th>
   </tr></thead><tbody><tr class="standing">
       <td class="c-rank num">1</td>
-      <td class="c-move"><span class="move move-up">▲</span></td>
+      <td class="c-move"><span class="move move-flat">—</span></td>
       <td class="c-model"><span class="mdot" style="background:#D97706"></span>
         <span class="mlabel">HARM</span> <span class="mprov">KNMI</span></td>
-      <td class="c-skill"><span class="num skill-num tone-ok">58</span>
-        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:58.416498939013906%"></span></span></td>
-      <td class="num c-metric tone-ok">71</td><td class="num c-metric tone-bad">38</td><td class="num c-metric tone-ok">66</td>
-      <td class="num c-record">24–6</td>
-      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">73</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:73.37638669750152%"></span></span></td>
+      <td class="num c-metric tone-ok">78</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">68</td>
+      <td class="num c-record">28–2</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
     </tr>
 <tr class="standing">
       <td class="c-rank num">2</td>
-      <td class="c-move"><span class="move move-down">▼</span></td>
-      <td class="c-model"><span class="mdot" style="background:#0EA5E9"></span>
-        <span class="mlabel">AIFS</span> <span class="mprov">ECMWF</span></td>
-      <td class="c-skill"><span class="num skill-num tone-ok">58</span>
-        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:57.9788093698642%"></span></span></td>
-      <td class="num c-metric tone-ok">69</td><td class="num c-metric tone-bad">36</td><td class="num c-metric tone-ok">69</td>
-      <td class="num c-record">23–7</td>
-      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
-    </tr>
-<tr class="standing">
-      <td class="c-rank num">3</td>
-      <td class="c-move"><span class="move move-flat">—</span></td>
-      <td class="c-model"><span class="mdot" style="background:#EC4899"></span>
-        <span class="mlabel">UKMO</span> <span class="mprov">Met Office</span></td>
-      <td class="c-skill"><span class="num skill-num tone-ok">55</span>
-        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:55.280846416301806%"></span></span></td>
-      <td class="num c-metric tone-ok">67</td><td class="num c-metric tone-bad">33</td><td class="num c-metric tone-ok">66</td>
-      <td class="num c-record">19–11</td>
-      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
-    </tr>
-<tr class="standing">
-      <td class="c-rank num">4</td>
-      <td class="c-move"><span class="move move-up">▲3</span></td>
-      <td class="c-model"><span class="mdot" style="background:#F97316"></span>
-        <span class="mlabel">AIGFS</span> <span class="mprov">NOAA</span></td>
-      <td class="c-skill"><span class="num skill-num tone-ok">55</span>
-        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:55.15411325110558%"></span></span></td>
-      <td class="num c-metric tone-ok">64</td><td class="num c-metric tone-bad">32</td><td class="num c-metric tone-ok">69</td>
-      <td class="num c-record">22–8</td>
-      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
-    </tr>
-<tr class="standing">
-      <td class="c-rank num">5</td>
       <td class="c-move"><span class="move move-up">▲</span></td>
       <td class="c-model"><span class="mdot" style="background:#2563EB"></span>
         <span class="mlabel">IFS</span> <span class="mprov">ECMWF</span></td>
-      <td class="c-skill"><span class="num skill-num tone-bad">55</span>
-        <span class="bar"><span class="bar-fill tone-bg-bad" style="width:54.77220281641315%"></span></span></td>
-      <td class="num c-metric tone-ok">63</td><td class="num c-metric tone-bad">35</td><td class="num c-metric tone-ok">66</td>
-      <td class="num c-record">21–9</td>
-      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">71</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:71.28037011515613%"></span></span></td>
+      <td class="num c-metric tone-ok">74</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">69</td>
+      <td class="num c-record">22–8</td>
+      <td class="c-form"><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span></td>
     </tr>
 <tr class="standing">
-      <td class="c-rank num">6</td>
+      <td class="c-rank num">3</td>
+      <td class="c-move"><span class="move move-down">▼</span></td>
+      <td class="c-model"><span class="mdot" style="background:#EC4899"></span>
+        <span class="mlabel">UKMO</span> <span class="mprov">Met Office</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">71</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:70.62980820864549%"></span></span></td>
+      <td class="num c-metric tone-ok">70</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">72</td>
+      <td class="num c-record">22–8</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">4</td>
+      <td class="c-move"><span class="move move-up">▲</span></td>
+      <td class="c-model"><span class="mdot" style="background:#9CA3AF"></span>
+        <span class="mlabel">Apple Weather</span> <span class="mprov">Apple Weather</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">70</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:69.61805073534981%"></span></span></td>
+      <td class="num c-metric tone-ok">69</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">71</td>
+      <td class="num c-record">22–3</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">5</td>
       <td class="c-move"><span class="move move-down">▼</span></td>
       <td class="c-model"><span class="mdot" style="background:#059669"></span>
         <span class="mlabel">ICON</span> <span class="mprov">DWD</span></td>
-      <td class="c-skill"><span class="num skill-num tone-bad">55</span>
-        <span class="bar"><span class="bar-fill tone-bg-bad" style="width:54.565236076383066%"></span></span></td>
-      <td class="num c-metric tone-ok">68</td><td class="num c-metric tone-bad">30</td><td class="num c-metric tone-ok">65</td>
-      <td class="num c-record">26–4</td>
-      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">70</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:69.61010928374868%"></span></span></td>
+      <td class="num c-metric tone-ok">72</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">67</td>
+      <td class="num c-record">27–3</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">6</td>
+      <td class="c-move"><span class="move move-flat">—</span></td>
+      <td class="c-model"><span class="mdot" style="background:#0EA5E9"></span>
+        <span class="mlabel">AIFS</span> <span class="mprov">ECMWF</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">69</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:69.38310616043826%"></span></span></td>
+      <td class="num c-metric tone-ok">68</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">71</td>
+      <td class="num c-record">20–10</td>
+      <td class="c-form"><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span></td>
     </tr>
 <tr class="standing">
       <td class="c-rank num">7</td>
-      <td class="c-move"><span class="move move-down">▼3</span></td>
-      <td class="c-model"><span class="mdot" style="background:#8B5CF6"></span>
-        <span class="mlabel">MeteoFR</span> <span class="mprov">Météo-France</span></td>
-      <td class="c-skill"><span class="num skill-num tone-bad">54</span>
-        <span class="bar"><span class="bar-fill tone-bg-bad" style="width:54.48960125414359%"></span></span></td>
-      <td class="num c-metric tone-ok">72</td><td class="num c-metric tone-bad">37</td><td class="num c-metric tone-none">—</td>
-      <td class="num c-record">21–9</td>
-      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+      <td class="c-move"><span class="move move-flat">—</span></td>
+      <td class="c-model"><span class="mdot" style="background:#F97316"></span>
+        <span class="mlabel">AIGFS</span> <span class="mprov">NOAA</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">68</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:68.0371592472281%"></span></span></td>
+      <td class="num c-metric tone-ok">63</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">73</td>
+      <td class="num c-record">22–8</td>
+      <td class="c-form"><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span></td>
     </tr>
 <tr class="standing">
       <td class="c-rank num">8</td>
-      <td class="c-move"><span class="move move-flat">—</span></td>
+      <td class="c-move"><span class="move move-up">▲2</span></td>
+      <td class="c-model"><span class="mdot" style="background:#8B5CF6"></span>
+        <span class="mlabel">MeteoFR</span> <span class="mprov">Météo-France</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">67</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:67.47978707854374%"></span></span></td>
+      <td class="num c-metric tone-ok">76</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">59</td>
+      <td class="num c-record">26–3</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">9</td>
+      <td class="c-move"><span class="move move-down">▼</span></td>
+      <td class="c-model"><span class="mdot" style="background:#8B5CF6"></span>
+        <span class="mlabel">Foreca</span> <span class="mprov">Foreca</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">67</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:67.01389377803538%"></span></span></td>
+      <td class="num c-metric tone-ok">68</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">66</td>
+      <td class="num c-record">8–6</td>
+      <td class="c-form"><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">10</td>
+      <td class="c-move"><span class="move move-down">▼</span></td>
       <td class="c-model"><span class="mdot" style="background:#DC2626"></span>
         <span class="mlabel">GFS</span> <span class="mprov">NOAA</span></td>
-      <td class="c-skill"><span class="num skill-num tone-bad">50</span>
-        <span class="bar"><span class="bar-fill tone-bg-bad" style="width:49.54651918218851%"></span></span></td>
-      <td class="num c-metric tone-ok">58</td><td class="num c-metric tone-bad">27</td><td class="num c-metric tone-ok">64</td>
-      <td class="num c-record">24–6</td>
-      <td class="c-form"><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span></td>
-    </tr></tbody></table>
+      <td class="c-skill"><span class="num skill-num tone-ok">67</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:66.63125752536722%"></span></span></td>
+      <td class="num c-metric tone-ok">64</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">69</td>
+      <td class="num c-record">27–3</td>
+      <td class="c-form"><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">11</td>
+      <td class="c-move"><span class="move move-up">▲</span></td>
+      <td class="c-model"><span class="mdot" style="background:#F59E0B"></span>
+        <span class="mlabel">OpenWeather</span> <span class="mprov">OpenWeatherMap</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">61</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:60.942195768539726%"></span></span></td>
+      <td class="num c-metric tone-ok">60</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">59</td>
+      <td class="num c-record">22–3</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">12</td>
+      <td class="c-move"><span class="move move-down">▼</span></td>
+      <td class="c-model"><span class="mdot" style="background:#10B981"></span>
+        <span class="mlabel">VisualCross</span> <span class="mprov">Visual Crossing</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">61</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:60.7590725610074%"></span></span></td>
+      <td class="num c-metric tone-ok">60</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">61</td>
+      <td class="num c-record">19–6</td>
+      <td class="c-form"><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span></td>
+    </tr>
+<tr class="standing">
+      <td class="c-rank num">13</td>
+      <td class="c-move"><span class="move move-flat">—</span></td>
+      <td class="c-model"><span class="mdot" style="background:#06B6D4"></span>
+        <span class="mlabel">WeatherAPI</span> <span class="mprov">WeatherAPI.com</span></td>
+      <td class="c-skill"><span class="num skill-num tone-ok">60</span>
+        <span class="bar"><span class="bar-fill tone-bg-ok" style="width:60.06234432618904%"></span></span></td>
+      <td class="num c-metric tone-ok">59</td><td class="num c-metric tone-none">—</td><td class="num c-metric tone-ok">61</td>
+      <td class="num c-record">23–2</td>
+      <td class="c-form"><span class="fdot fdot-hit"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-hit"></span><span class="fdot fdot-miss"></span><span class="fdot fdot-miss"></span></td>
+    </tr></tbody></table><p class="foot-note">* rain not scored — the window was too dry for rain calls to mean anything.</p>
         <!-- /BAKE:STANDINGS -->
       </div>
     </section>
@@ -235,6 +297,18 @@
             call at 0.1&nbsp;mm; a form dot fills when that day's next-day skill ≥ 70.
             The ▲▼ movement column compares today's ranking with the same table computed
             a week ago (the window minus its last 7 days).</p>
+          <p><b>Airport boards (the ✈ toggle)</b> re-score every model at the city's main
+            airport, whose METAR weather station reports real instrument readings around the
+            clock. On those boards the server verifies <b>temperature and wind against the
+            station's own METAR observations</b> instead of the model analysis — actual
+            thermometer-and-anemometer truth — while rain keeps the analysis (METAR
+            precipitation groups are too sparse to score against). The in-browser charts
+            (receipt, labs) still compare public models to the analysis at the airport's
+            coordinates, so their curves can differ slightly from the standings. Chicago,
+            Mexico City and Sydney's city boards already sit on their airport's grid cell,
+            so for them the two views read the same measurement point. Airport standings
+            started accruing later than the city boards at some airports, so a shorter
+            "last N days" window there is expected until the archive fills.</p>
           <p>Public-model forecasts come from Open-Meteo's
             <a href="https://open-meteo.com/en/docs/previous-runs-api">previous runs archive</a>
             (what each model actually said 1 to 7 days earlier). The reference series is
@@ -253,7 +327,7 @@
       </details>
       <p class="colophon">
         static front end, public models scored daily in CI and re-scored live in your browser ·
-        <!-- BAKE:GENERATED --> baked 2026-07-07 16:11 UTC · <!-- /BAKE:GENERATED -->
+        <!-- BAKE:GENERATED --> baked 2026-08-07 07:12 UTC · <!-- /BAKE:GENERATED -->
         <a href="history.html">long-term model trends</a> ·
         <a href="https://github.com/NickLeenders/verisky-scoreboard">source</a> · data by
         <a href="https://open-meteo.com/">Open-Meteo</a> (CC-BY 4.0),

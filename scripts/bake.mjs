@@ -28,7 +28,7 @@ import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { CITIES, DEFAULT_CITY_ID, WINDOW_PAST_DAYS } from '../js/config.js';
+import { CITIES, DEFAULT_CITY_ID, WINDOW_PAST_DAYS, airportSite, siteSlug } from '../js/config.js';
 import { fetchCityData } from '../js/fetch.js';
 import { scorePayload } from '../js/pipeline.js';
 import { buildStandings, scoreTone } from '../js/derive.js';
@@ -156,7 +156,15 @@ async function bakeIndexHtml(featured, generatedAt) {
 const generatedAt = new Date().toISOString();
 await mkdir(DATA_DIR, { recursive: true });
 
-console.log(`Baking ${CITIES.length} cities (window ${WINDOW_PAST_DAYS}d)${FROM_CACHE ? ' — from cache' : ''}…`);
+// Every city plus its airport-station variant (baked as data/<id>-airport.json,
+// same shape). The airport runs the identical pipeline at the station's
+// coordinates; its server board additionally carries METAR-verified standings.
+const TARGETS = CITIES.flatMap((city) => {
+  const airport = airportSite(city);
+  return airport ? [city, airport] : [city];
+});
+
+console.log(`Baking ${TARGETS.length} boards (${CITIES.length} cities + airports, window ${WINDOW_PAST_DAYS}d)${FROM_CACHE ? ' — from cache' : ''}…`);
 
 const summary = {
   generatedAt,
@@ -166,13 +174,14 @@ const summary = {
   failures: [],
 };
 
-const results = await pool(CITIES, CITY_CONCURRENCY, async (city) => {
+const results = await pool(TARGETS, CITY_CONCURRENCY, async (city) => {
+  const slug = siteSlug(city);
   const [publicPayload, presetBoard] = await Promise.all([
     FROM_CACHE
-      ? JSON.parse(await readFile(join(DATA_DIR, `${city.id}.json`), 'utf8'))
+      ? JSON.parse(await readFile(join(DATA_DIR, `${slug}.json`), 'utf8'))
       : fetchCityData(city),
     fetchPresetScoreboard(city).catch((error) => {
-      console.warn(`  ! ${city.name}: preset scoreboard unavailable (${error.message})`);
+      console.warn(`  ! ${slug}: preset scoreboard unavailable (${error.message})`);
       return null;
     }),
   ]);
@@ -182,14 +191,17 @@ const results = await pool(CITIES, CITY_CONCURRENCY, async (city) => {
 });
 
 let ok = 0;
-const perCity = {}; // cityId → { rows, scoredDays, rainOff }
+const perCity = {}; // site slug → { rows, scoredDays, rainOff }
 
-for (let i = 0; i < CITIES.length; i++) {
-  const city = CITIES[i];
+for (let i = 0; i < TARGETS.length; i++) {
+  const city = TARGETS[i];
+  const slug = siteSlug(city);
+  const isAirport = city.site === 'airport';
+  const boardName = isAirport ? `${city.name} · ${city.airport.name}` : city.name;
   const r = results[i];
   if (!r.ok) {
-    console.warn(`  ✗ ${city.name}: ${r.error.message}`);
-    summary.failures.push({ id: city.id, error: r.error.message });
+    console.warn(`  ✗ ${boardName}: ${r.error.message}`);
+    summary.failures.push({ id: slug, error: r.error.message });
     continue;
   }
   ok += 1;
@@ -199,7 +211,7 @@ for (let i = 0; i < CITIES.length; i++) {
   //    Skipped in from-cache mode: we're reading these, not refreshing them.
   if (!FROM_CACHE) {
     await writeFile(
-      join(DATA_DIR, `${city.id}.json`),
+      join(DATA_DIR, `${slug}.json`),
       JSON.stringify({ generatedAt, city, truth, predictions }),
     );
   }
@@ -211,16 +223,18 @@ for (let i = 0; i < CITIES.length; i++) {
   const dateRange = presetBoard?.dateRange
     ?? (dates.length ? [dates[0], dates[dates.length - 1]] : null);
   const rainOff = !(presetBoard?.scores ?? scores).rainEligibility.rainScoreEligible;
-  perCity[city.id] = { rows, scoredDays, rainOff };
+  perCity[slug] = { rows, scoredDays, rainOff };
 
-  summary.cities[city.id] = {
-    name: city.name,
+  summary.cities[slug] = {
+    name: presetBoard?.city?.name ?? boardName,
     country: city.country ?? null,
+    site: isAirport ? 'airport' : 'city',
+    ...(isAirport ? { station: { icao: city.airport.icao, name: city.airport.name } } : {}),
     timezone: presetBoard?.timezone ?? timezone,
     scoredDays,
     dateRange,
     rainScored: !rainOff,
-    headline: headlineFor(city.name, scoredDays, rows),
+    headline: headlineFor(presetBoard?.city?.name ?? boardName, scoredDays, rows),
     standings: rows.map((row) => ({
       rank: row.rank,
       model: {
@@ -239,7 +253,7 @@ for (let i = 0; i < CITIES.length; i++) {
     })),
   };
   console.log(
-    `  ✓ ${city.name}: ${scoredDays} days, ${rows.length} models, leader ${rows[0]?.model.label ?? '—'} ${fmt(rows[0]?.skill)}`,
+    `  ✓ ${boardName}: ${scoredDays} days, ${rows.length} models, leader ${rows[0]?.model.label ?? '—'} ${fmt(rows[0]?.skill)}`,
   );
 }
 
@@ -263,6 +277,6 @@ const featured = feat
 await bakeIndexHtml(featured, generatedAt);
 
 console.log(
-  `\nBaked ${ok}/${CITIES.length} cities → data/*.json, data/scores.json, index.html` +
+  `\nBaked ${ok}/${TARGETS.length} boards → data/*.json, data/scores.json, index.html` +
   `${featured ? ` (featured: ${summary.cities[featuredId].name})` : ''}.`,
 );

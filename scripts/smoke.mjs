@@ -4,13 +4,16 @@
  * without a browser. Usage: node scripts/smoke.mjs [cityId]
  */
 
-import { CITIES, LEAD_DAYS } from '../js/config.js';
+import { CITIES, LEAD_DAYS, airportSite } from '../js/config.js';
 import { runCity } from '../js/pipeline.js';
 
+// `<id>-airport` runs the same pipeline at the city's airport station.
 const cityId = process.argv[2] ?? 'amsterdam';
-const city = CITIES.find((c) => c.id === cityId);
+const baseId = cityId.endsWith('-airport') ? cityId.slice(0, -'-airport'.length) : cityId;
+const preset = CITIES.find((c) => c.id === baseId);
+const city = cityId.endsWith('-airport') ? airportSite(preset) : preset;
 if (!city) {
-  console.error(`Unknown city "${cityId}". Options: ${CITIES.map((c) => c.id).join(', ')}`);
+  console.error(`Unknown city "${cityId}". Options: ${CITIES.flatMap((c) => [c.id, `${c.id}-airport`]).join(', ')}`);
   process.exit(1);
 }
 

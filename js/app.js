@@ -10,7 +10,7 @@
  * user types — and fetches forecast data only on selection.
  */
 
-import { CITIES, DEFAULT_CITY_ID } from './config.js';
+import { CITIES, DEFAULT_CITY_ID, airportSite } from './config.js';
 import { fetchCityData } from './fetch.js';
 import { scorePayload } from './pipeline.js';
 import { readCache, writeCache } from './cache.js';
@@ -62,7 +62,11 @@ function cityFromUrl() {
   const id = params.get('city');
   if (id) {
     const preset = CITIES.find((c) => c.id === id);
-    if (preset) return preset;
+    if (preset) {
+      // ?site=airport switches the preset to its airport weather station.
+      if (params.get('site') === 'airport') return airportSite(preset) ?? preset;
+      return preset;
+    }
   }
   const lat = parseFloat(params.get('lat'));
   const lon = parseFloat(params.get('lon'));
@@ -75,7 +79,9 @@ function cityFromUrl() {
 }
 
 function urlForCity(city) {
-  if (city.id) return `?city=${encodeURIComponent(city.id)}`;
+  if (city.id) {
+    return `?city=${encodeURIComponent(city.id)}${city.site === 'airport' ? '&site=airport' : ''}`;
+  }
   const country = city.country ? `&country=${encodeURIComponent(city.country)}` : '';
   return `?name=${encodeURIComponent(city.name)}&lat=${city.lat.toFixed(2)}&lon=${city.lon.toFixed(2)}${country}`;
 }
@@ -198,8 +204,9 @@ function render(city, { aligned, scores, timezone, presetBoard = null }) {
   const dates = aligned.scoredDates;
   const shownDays = presetBoard?.scoredDays ?? dates.length;
   const shownTimezone = presetBoard?.timezone ?? timezone;
+  const siteTag = city.site === 'airport' && city.airport ? ` · ✈ ${city.airport.icao}` : '';
   $('#window-label').textContent =
-    `last ${shownDays} days · all lead days · ${shownTimezone}`;
+    `last ${shownDays} days · all lead days · ${shownTimezone}${siteTag}`;
 
   // Page order per §6/§8: standings first…
   renderStandings(aligned, scores, presetBoard);
@@ -577,6 +584,58 @@ function syncSelector(city) {
     if (!custom) select.prepend(opt);
     select.value = '__custom';
   }
+  syncSiteUi(city);
+}
+
+// ── City ⇄ Airport site toggle + station banner ─────────────────────────────
+
+function syncSiteUi(city) {
+  const toggle = $('#site-toggle');
+  const banner = $('#site-banner');
+  if (!toggle || !banner) return;
+
+  const hasAirport = Boolean(city.id && city.airport);
+  const onAirport = city.site === 'airport';
+  // Custom searched cities have no tracked airport station — hide the control
+  // entirely rather than offering a dead switch.
+  toggle.hidden = !hasAirport;
+  for (const btn of toggle.querySelectorAll('button')) {
+    const active = (btn.dataset.site === 'airport') === onAirport;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  }
+
+  if (hasAirport && onAirport) {
+    const a = city.airport;
+    banner.hidden = false;
+    banner.innerHTML =
+      `<span class="site-banner-icon" aria-hidden="true">✈</span>
+      <span class="site-banner-text"><b>${esc(a.name)} (${esc(a.icao)})</b> — ${esc(city.name)}'s
+        airport weather station. Temperature and wind on this board are verified against the
+        station's own METAR observations; rain is verified against the model analysis.</span>` +
+      (a.sameCell
+        ? `<span class="site-banner-note">${esc(city.name)}'s city board reads the same grid
+          cell — the airport is the city's measurement point.</span>`
+        : '');
+  } else {
+    banner.hidden = true;
+    banner.innerHTML = '';
+  }
+}
+
+function initSiteToggle() {
+  const toggle = $('#site-toggle');
+  if (!toggle) return;
+  for (const btn of toggle.querySelectorAll('button')) {
+    btn.addEventListener('click', () => {
+      if (!currentCity?.id) return;
+      const base = CITIES.find((c) => c.id === currentCity.id);
+      if (!base) return;
+      const wantAirport = btn.dataset.site === 'airport';
+      if (wantAirport === (currentCity.site === 'airport')) return;
+      loadCity(wantAirport ? airportSite(base) ?? base : base);
+    });
+  }
 }
 
 function initTopBar() {
@@ -589,7 +648,11 @@ function initTopBar() {
   }
   select.addEventListener('change', () => {
     const preset = CITIES.find((c) => c.id === select.value);
-    if (preset) loadCity(preset);
+    if (!preset) return;
+    // Keep the airport view across city switches (comparing airports is a
+    // legitimate browse mode); fall back to the city when there is no airport.
+    const stayAirport = currentCity?.site === 'airport';
+    loadCity(stayAirport ? airportSite(preset) ?? preset : preset);
   });
 
   const input = $('#city-search');
@@ -682,5 +745,6 @@ function initUnitToggle() {
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 initTopBar();
+initSiteToggle();
 initUnitToggle();
 loadCity(cityFromUrl());

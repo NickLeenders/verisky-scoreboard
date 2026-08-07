@@ -198,28 +198,68 @@ export function resolveRoster(city) {
  * server has commercial scores for — nudging a coordinate here can move the
  * cell and drop the whole commercial half of the board.
  *
+ * `airport` is the city's main airport / METAR weather station, tracked on the
+ * server as the `<id>-airport` scoreboard preset. Its coordinates are the METAR
+ * registry's station coordinates and must match the server's airport preset the
+ * same way the city coordinates must. At the airport cell the server verifies
+ * temperature and wind against the station's own METAR observations instead of
+ * the model analysis. `sameCell: true` marks cities whose city board already
+ * sits on the airport's 0.1° cell (the two boards read the same stored rows).
+ *
  * Adding a city here also enrolls it in `history.html` (HISTORY_CITY_IDS is
- * derived from this list). Until `scripts/history-backfill.mjs` has baked
- * `data/history/<id>.json`, that page shows its "not baked yet" notice for the
- * new city — the live board is unaffected.
+ * derived from this list; airports are deliberately not enrolled). Until
+ * `scripts/history-backfill.mjs` has baked `data/history/<id>.json`, that page
+ * shows its "not baked yet" notice for the new city — the live board is
+ * unaffected.
  */
 export const CITIES = [
   // Europe
-  { id: 'amsterdam', name: 'Amsterdam', lat: 52.37, lon: 4.89, country: 'NL' },
-  { id: 'london', name: 'London', lat: 51.51, lon: -0.13, country: 'GB' },
-  { id: 'berlin', name: 'Berlin', lat: 52.52, lon: 13.41, country: 'DE' },
-  { id: 'paris', name: 'Paris', lat: 48.86, lon: 2.35, country: 'FR' },
-  { id: 'vienna', name: 'Vienna', lat: 48.21, lon: 16.37, country: 'AT' },
+  { id: 'amsterdam', name: 'Amsterdam', lat: 52.37, lon: 4.89, country: 'NL',
+    airport: { icao: 'EHAM', name: 'Schiphol', lat: 52.315, lon: 4.79 } },
+  { id: 'london', name: 'London', lat: 51.51, lon: -0.13, country: 'GB',
+    airport: { icao: 'EGLL', name: 'Heathrow', lat: 51.477, lon: -0.461 } },
+  { id: 'berlin', name: 'Berlin', lat: 52.52, lon: 13.41, country: 'DE',
+    airport: { icao: 'EDDB', name: 'Brandenburg', lat: 52.38068, lon: 13.53064 } },
+  { id: 'paris', name: 'Paris', lat: 48.86, lon: 2.35, country: 'FR',
+    airport: { icao: 'LFPG', name: 'Charles de Gaulle', lat: 49.015, lon: 2.534 } },
+  { id: 'vienna', name: 'Vienna', lat: 48.21, lon: 16.37, country: 'AT',
+    airport: { icao: 'LOWW', name: 'Vienna Intl', lat: 48.117, lon: 16.582 } },
   // North America
-  { id: 'newyork', name: 'New York', lat: 40.71, lon: -74.01, country: 'US' },
-  { id: 'chicago', name: 'Chicago', lat: 41.98, lon: -87.90, country: 'US' },
-  { id: 'toronto', name: 'Toronto', lat: 43.66, lon: -79.38, country: 'CA' },
-  { id: 'vancouver', name: 'Vancouver', lat: 49.28, lon: -123.12, country: 'CA' },
-  { id: 'mexicocity', name: 'Mexico City', lat: 19.43, lon: -99.13, country: 'MX' },
+  { id: 'newyork', name: 'New York', lat: 40.71, lon: -74.01, country: 'US',
+    airport: { icao: 'KJFK', name: 'JFK', lat: 40.63916, lon: -73.76394 } },
+  { id: 'chicago', name: 'Chicago', lat: 41.98, lon: -87.90, country: 'US',
+    airport: { icao: 'KORD', name: "O'Hare", lat: 41.96017, lon: -87.93161, sameCell: true } },
+  { id: 'toronto', name: 'Toronto', lat: 43.66, lon: -79.38, country: 'CA',
+    airport: { icao: 'CYYZ', name: 'Pearson', lat: 43.679, lon: -79.629 } },
+  { id: 'vancouver', name: 'Vancouver', lat: 49.28, lon: -123.12, country: 'CA',
+    airport: { icao: 'CYVR', name: 'Vancouver Intl', lat: 49.183, lon: -123.168 } },
+  { id: 'mexicocity', name: 'Mexico City', lat: 19.43, lon: -99.13, country: 'MX',
+    airport: { icao: 'MMMX', name: 'Benito Juárez', lat: 19.436, lon: -99.072, sameCell: true } },
   // Asia-Pacific
-  { id: 'tokyo', name: 'Tokyo', lat: 35.68, lon: 139.69, country: 'JP' },
-  { id: 'bangkok', name: 'Bangkok', lat: 13.74, lon: 100.52, country: 'TH' },
-  { id: 'sydney', name: 'Sydney', lat: -33.87, lon: 151.21, country: 'AU' },
+  { id: 'tokyo', name: 'Tokyo', lat: 35.68, lon: 139.69, country: 'JP',
+    airport: { icao: 'RJTT', name: 'Haneda', lat: 35.553, lon: 139.781 } },
+  { id: 'bangkok', name: 'Bangkok', lat: 13.74, lon: 100.52, country: 'TH',
+    airport: { icao: 'VTBS', name: 'Suvarnabhumi', lat: 13.686, lon: 100.767 } },
+  { id: 'sydney', name: 'Sydney', lat: -33.87, lon: 151.21, country: 'AU',
+    airport: { icao: 'YSSY', name: 'Sydney Airport', lat: -33.946, lon: 151.173, sameCell: true } },
 ];
 
 export const DEFAULT_CITY_ID = 'amsterdam';
+
+/**
+ * The airport-station variant of a preset city: same city identity (id,
+ * country → same roster), but located at the airport's METAR station and
+ * marked `site: 'airport'`. Every stage keys on `site` to keep the two boards
+ * apart (cache entries, baked files, the server scoreboard slug, the URL).
+ * Returns null when the city has no tracked airport (custom searched cities).
+ */
+export function airportSite(city) {
+  if (!city || !city.id || !city.airport) return null;
+  return { ...city, site: 'airport', lat: city.airport.lat, lon: city.airport.lon };
+}
+
+/** The server-scoreboard slug / baked-file basename for a loaded location. */
+export function siteSlug(city) {
+  if (!city || !city.id) return null;
+  return city.site === 'airport' ? `${city.id}-airport` : city.id;
+}

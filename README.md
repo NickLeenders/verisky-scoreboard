@@ -20,15 +20,35 @@ Then open http://localhost:8000.
 
 On a cold start the page fetches from Open-Meteo and scores everything in the
 browser, so give it a moment. Results are cached in localStorage for about six
-hours, so reloads are instant. For the six preset cities it also reads a small
+hours, so reloads are instant. For the preset cities it also reads a small
 aggregate-only scoreboard from `api.verisky.app`; custom locations remain
 public-model-only.
+
+### Airport boards (the ✈ City ⇄ Airport toggle)
+
+Every preset city has an **airport twin**: the same board re-scored at the
+city's main airport, whose METAR weather station reports real instrument
+readings around the clock. The topbar's City ⇄ Airport toggle switches between
+them (never shown for custom searched cities), a banner above the standings
+names the station (e.g. *Schiphol (EHAM)*), and `?city=london&site=airport` is
+the shareable URL form. On airport boards the server verifies **temperature and
+wind against the station's own METAR observations** instead of the model
+analysis; rain keeps the analysis. The server publishes them as
+`/scoreboard/v1/<city>-airport.json` (same shape as the city boards plus a
+`station: { icao, name }` field), and the bake writes matching
+`data/<city>-airport.json` payloads plus `scores.json` entries. Airport
+metadata lives on each city in `js/config.js` (`airport: { icao, name, lat,
+lon }`); coordinates must match the server's airport presets the same way city
+coordinates must. Chicago, Mexico City and Sydney's city boards already sit on
+their airport's grid cell (`sameCell: true`), so their two views read the same
+measurement point.
 
 You can also run the scoring outside the browser with Node 18+:
 
 ```sh
-node scripts/smoke.mjs amsterdam   # score one city and print the standings
-node scripts/bake.mjs              # score all preset cities, write data/*.json
+node scripts/smoke.mjs amsterdam           # score one city and print the standings
+node scripts/smoke.mjs amsterdam-airport   # same pipeline at the airport station
+node scripts/bake.mjs                      # score all preset cities + airports, write data/*.json
 ```
 
 `bake.mjs` is optional. It precomputes the standings into `data/` and injects
@@ -38,7 +58,8 @@ loading skeletons. The page works fine without it.
 ### Commercial score boundary
 
 The browser never receives commercial forecast values or credentials.
-`/scoreboard/v1/<preset>.json` accepts only the six compiled-in city slugs and
+`/scoreboard/v1/<preset>.json` accepts only the compiled-in preset slugs (each
+city plus its `<city>-airport` twin) and
 returns stored aggregate scores (standings, form, rain record, and per-lead
 skill). It accepts no coordinates, model ids, provider ids, or run selectors,
 does not trigger a score refresh or provider request, and excludes AccuWeather.
@@ -85,6 +106,7 @@ automatically; HRRR is excluded structurally (it duplicates GFS at short lead).
 ### URL parameters
 
 - `?city=tokyo` loads a preset city
+- `?city=tokyo&site=airport` loads that city's airport weather-station board
 - `?name=Utrecht&lat=52.09&lon=5.12` loads any location by coordinates
 - `&lab=ecmwf_ifs025` opens a specific model's detail row on load
 

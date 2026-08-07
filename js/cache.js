@@ -17,7 +17,7 @@
  * our prefix and retries once.
  */
 
-import { resolveRoster } from './config.js';
+import { resolveRoster, siteSlug } from './config.js';
 
 const PREFIX = 'vsky:1:';
 const TTL_MS = 6 * 60 * 60 * 1000;
@@ -28,9 +28,10 @@ const modelSetKey = (city) => resolveRoster(city).map((m) => m.id).join(',');
 
 const utcDate = () => new Date().toISOString().slice(0, 10);
 
-/** Stable cache identity for a city (presets by id, searched cities by coords). */
+/** Stable cache identity for a location (presets by site slug — so a city and
+ *  its airport variant cache separately — searched cities by coords). */
 export function cityKey(city) {
-  return city.id ?? `geo:${city.lat.toFixed(2)},${city.lon.toFixed(2)}`;
+  return siteSlug(city) ?? `geo:${city.lat.toFixed(2)},${city.lon.toFixed(2)}`;
 }
 
 const storageKey = (city, date) => `${PREFIX}${cityKey(city)}|${modelSetKey(city)}|${date}`;
