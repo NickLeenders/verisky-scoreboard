@@ -108,17 +108,69 @@ function zoomAxis(scores, target = 4) {
 }
 
 /**
- * @param {Array<{model:Object, points:Array<{day:number, score:number}>}>} series
+ * How many models may be coloured at once.
+ *
+ * Four is not a layout budget, it is the honest ceiling: thirteen hues cannot be
+ * told apart, so identity comes from the labels drawn on the coloured lines and
+ * only a handful of those fit. Picking a fifth model drops the oldest pick.
  */
-export function leadTimeChart(series, { width = 560, height = 250 } = {}) {
+export const LEAD_FOCUS_LIMIT = 4;
+
+/** Every unpicked curve falls back to this one context gray. */
+const LEAD_CONTEXT = 'rgba(148, 163, 184, 0.26)';
+const LEAD_CROSSHAIR = '#38bdf8';
+
+/** Rough width of one character at the size the end labels are drawn. */
+const LABEL_CHAR_W = 5.6;
+/** The end dot, the gap, and the score that follow a label. */
+const LABEL_EXTRA_W = 26;
+const MIN_LABEL_GUTTER = 46;
+const MAX_LABEL_GUTTER = 108;
+
+/**
+ * Room to reserve at the right for the direct labels that replaced the legend.
+ * Sized to the labels actually drawn: a chart showing IFS and GFS keeps its plot
+ * wide, one showing "Apple Weather" gives up the width rather than clipping the
+ * name off the edge.
+ */
+function labelGutter(labels) {
+  const widest = labels.reduce((max, label) => Math.max(max, label.length), 0);
+  if (widest === 0) return MIN_LABEL_GUTTER;
+  return Math.min(MAX_LABEL_GUTTER, Math.max(MIN_LABEL_GUTTER, widest * LABEL_CHAR_W + LABEL_EXTRA_W));
+}
+
+/**
+ * "Skill by lead time" as curves — the shape view, behind the grid.
+ *
+ * Every model is drawn, but only the picked few are coloured; the rest fall back
+ * to one context gray, so the decay shape stays visible without thirteen lines
+ * competing for the same two points of vertical space. The swatch legend is
+ * gone: coloured lines are labelled where they end, and the caller's crosshair
+ * puts the exact ranking at one lead day above the chart.
+ *
+ * @param {Array<{model:Object, points:Array<{day:number, score:number}>}>} series
+ * @param {{width?:number, height?:number, focusIds?:string[]|Set<string>, cursorDay?:number|null}} opts
+ */
+export function leadTimeChart(series, { width = 560, height = 250, focusIds = [], cursorDay = null } = {}) {
+  const focus = focusIds instanceof Set ? focusIds : new Set(focusIds);
+  const scored = series.map((s) => ({
+    ...s,
+    points: s.points.filter((p) => p.score != null && Number.isFinite(p.score)),
+  }));
+  const maxDay = scored.reduce(
+    (max, s) => s.points.reduce((m, p) => Math.max(m, p.day), max),
+    1,
+  );
+  const span = Math.max(1, maxDay - 1);
+
   const L = 34;
-  const R = 74;
+  const R = labelGutter(scored.filter((s) => focus.has(s.model.id)).map((s) => s.model.label));
   const T = 12;
   const B = 26;
   const plotW = width - L - R;
   const plotH = height - T - B;
-  const { lo, hi, ticks } = zoomAxis(series.flatMap((s) => s.points.map((p) => p.score)));
-  const x = (day) => L + ((day - 1) / 6) * plotW;
+  const { lo, hi, ticks } = zoomAxis(scored.flatMap((s) => s.points.map((p) => p.score)));
+  const x = (day) => L + ((day - 1) / span) * plotW;
   const y = (score) => T + (1 - (score - lo) / (hi - lo)) * plotH;
 
   const parts = [];
@@ -129,40 +181,74 @@ export function leadTimeChart(series, { width = 560, height = 250 } = {}) {
       `<text x="${L - 6}" y="${px(y(tick) + 3)}" fill="${C.textMuted}" font-size="9" text-anchor="end">${tick}</text>`,
     );
   }
-  for (let day = 1; day <= 7; day++) {
+  for (let day = 1; day <= maxDay; day++) {
     parts.push(
       `<line x1="${px(x(day))}" x2="${px(x(day))}" y1="${T + plotH}" y2="${T + plotH + 4}" stroke="${C.grid}" stroke-width="0.5"/>`,
       `<text x="${px(x(day))}" y="${T + plotH + 16}" fill="${C.textMuted}" font-size="9" text-anchor="middle">${day}d</text>`,
     );
   }
 
-  for (const s of series) {
-    const pts = s.points.map((p) => ({ x: x(p.day), y: y(p.score) }));
-    if (pts.length >= 2) {
-      parts.push(`<path d="${monotonePath(pts)}" stroke="${s.model.color}" stroke-width="2" fill="none"/>`);
-    }
-    for (const p of pts) {
-      parts.push(`<circle cx="${px(p.x)}" cy="${px(p.y)}" r="2" fill="${s.model.color}"/>`);
-    }
-  }
-
-  // Direct labels on the top-3 (by final point) + the worst.
-  const byEnd = series
-    .filter((s) => s.points.length > 0)
-    .map((s) => {
-      const last = s.points[s.points.length - 1];
-      return { s, endX: x(last.day), y: y(last.score), score: last.score };
-    })
-    .sort((a, b) => b.score - a.score);
-  const labelled = byEnd.length <= 4 ? byEnd : [...byEnd.slice(0, 3), byEnd[byEnd.length - 1]];
-  spreadLabels(labelled, 12, T + 6, T + plotH - 2);
-  for (const l of labelled) {
+  if (cursorDay != null) {
     parts.push(
-      `<text x="${px(l.endX + 6)}" y="${px(l.y + 3)}" fill="${l.s.model.color}" font-size="10" font-weight="600">${esc(l.s.model.label)} ${Math.round(l.score)}</text>`,
+      `<line x1="${px(x(cursorDay))}" x2="${px(x(cursorDay))}" y1="${T}" y2="${T + plotH}" ` +
+      `stroke="${LEAD_CROSSHAIR}" stroke-width="1" stroke-dasharray="3 3" opacity="0.7"/>`,
     );
   }
 
-  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Skill by lead time">${parts.join('')}</svg>`;
+  // Context pass first, picked lines on top of it.
+  for (const focusPass of [false, true]) {
+    for (const s of scored) {
+      if (focus.has(s.model.id) !== focusPass) continue;
+      if (s.points.length === 0) continue;
+      const stroke = focusPass ? s.model.color : LEAD_CONTEXT;
+      const pts = s.points.map((p) => ({ x: x(p.day), y: y(p.score) }));
+      if (pts.length === 1) {
+        parts.push(`<circle cx="${px(pts[0].x)}" cy="${px(pts[0].y)}" r="3" fill="${stroke}"/>`);
+        continue;
+      }
+      parts.push(
+        `<path d="${monotonePath(pts)}" stroke="${stroke}" stroke-width="${focusPass ? 2.25 : 1.25}" fill="none"/>`,
+      );
+    }
+  }
+
+  // Direct labels where each picked line ends.
+  const labels = scored
+    .filter((s) => focus.has(s.model.id) && s.points.length > 0)
+    .map((s) => {
+      const last = s.points[s.points.length - 1];
+      return { s, anchorX: x(last.day), anchorY: y(last.score), y: y(last.score), score: last.score };
+    });
+  spreadLabels(labels, 12, T + 6, T + plotH - 2);
+  for (const l of labels) {
+    parts.push(
+      `<circle cx="${px(l.anchorX)}" cy="${px(l.anchorY)}" r="3" fill="${l.s.model.color}"/>`,
+      `<text x="${px(l.anchorX + 6)}" y="${px(l.y + 3)}" fill="${l.s.model.color}" font-size="10" font-weight="700">${esc(l.s.model.label)} ${Math.round(l.score)}</text>`,
+    );
+  }
+
+  // Geometry for the pointer readout — the page reads a lead day back out of a
+  // mouse position without re-deriving the layout constants.
+  return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Skill by lead time"
+    data-vbw="${width}" data-plot-l="${L}" data-plot-w="${px(plotW)}" data-max-day="${maxDay}"
+    >${parts.join('')}</svg>`;
+}
+
+/**
+ * The (fractional) lead day under a pointer, from the geometry `leadTimeChart`
+ * stamped on the SVG. Null when the chart has no width yet. Callers snap this to
+ * a day a model actually scored.
+ */
+export function leadDayAtClientX(svg, clientX) {
+  const rect = svg.getBoundingClientRect();
+  const viewWidth = Number(svg.dataset.vbw);
+  const left = Number(svg.dataset.plotL);
+  const plotW = Number(svg.dataset.plotW);
+  const maxDay = Number(svg.dataset.maxDay);
+  if (!rect.width || !viewWidth || !plotW || !Number.isFinite(left) || !maxDay) return null;
+  const xInView = ((clientX - rect.left) / rect.width) * viewWidth;
+  const ratio = Math.max(0, Math.min(1, (xInView - left) / plotW));
+  return 1 + ratio * Math.max(0, maxDay - 1);
 }
 
 // ── Yesterday's receipt: rain timing lanes ───────────────────────────────────

@@ -1,7 +1,8 @@
 /**
  * Offline checks for the parts of the board that have no browser to catch them:
- * the score-v2 math, the breakdown block's honesty guards, and the server
- * payload's dual-score hydration. No network, so CI can run it before the bake.
+ * the score-v2 math, the breakdown block's honesty guards, the lead-time grid's
+ * ranking rules, and the server payload's dual-score hydration. No network, so
+ * CI can run it before the bake.
  *
  * Usage:  node scripts/check.mjs
  */
@@ -21,6 +22,13 @@ import {
   newAcc,
 } from '../js/score.js';
 import { breakdownHtml, hasBreakdown } from '../js/breakdown.js';
+import {
+  buildLeadTimeGrid,
+  sortLeadTimeGrid,
+  rankedModelIds,
+  rampStep,
+  RAMP_STEPS,
+} from '../js/leadTimeGrid.js';
 import { hydratePresetScoreboard } from '../js/server-scoreboard.js';
 
 let checks = 0;
@@ -299,6 +307,56 @@ ok('AccuWeather stays structurally absent whatever the payload says', () => {
     'amsterdam',
   );
   assert.deepEqual(board.rows.map((r) => r.model.id), ['knmi_seamless']);
+});
+
+// ── Lead-time grid (the card's default view) ───────────────────────────────
+
+const gridSeries = (spec) =>
+  Object.entries(spec).map(([id, byDay]) => ({
+    model: { id, label: id, color: '#fff' },
+    points: Object.entries(byDay).map(([day, score]) => ({ day: Number(day), score })),
+  }));
+
+ok('the grid drops columns no model reaches and keeps rows aligned to them', () => {
+  const grid = buildLeadTimeGrid(gridSeries({
+    ifs: { 1: 80, 2: 70, 3: 60 },
+    harm: { 1: 90, 2: 88 },
+  }));
+  assert.deepEqual(grid.columns, [1, 2, 3], 'days 4-7 are scored by nobody');
+  assert.deepEqual(grid.rows[1].cells, [90, 88, null]);
+  assert.equal(grid.rows[1].fullCoverage, false);
+  assert.equal(grid.rows[0].fullCoverage, true);
+  assert.equal(Math.round(grid.rows[1].average), 89);
+});
+
+ok('a short-horizon model cannot win the average, but can win a column', () => {
+  const grid = buildLeadTimeGrid(gridSeries({
+    ifs: { 1: 80, 2: 70, 3: 60 },
+    harm: { 1: 90, 2: 88 },
+  }));
+  // HARM's 89 beats IFS's 70, but it is averaging only the easy near leads.
+  assert.deepEqual(sortLeadTimeGrid(grid, 'average').map((r) => r.model.id), ['ifs', 'harm']);
+  assert.deepEqual(sortLeadTimeGrid(grid, 0).map((r) => r.model.id), ['harm', 'ifs']);
+  assert.deepEqual(sortLeadTimeGrid(grid, 2).map((r) => r.model.id), ['ifs', 'harm'], 'no score sorts last');
+});
+
+ok('an unscored model has no average and never leads the default order', () => {
+  const grid = buildLeadTimeGrid(gridSeries({ dead: {}, ifs: { 1: 40 } }));
+  assert.deepEqual(grid.columns, [1]);
+  assert.equal(grid.rows[0].average, null);
+  assert.deepEqual(sortLeadTimeGrid(grid, 'average').map((r) => r.model.id), ['ifs', 'dead']);
+  assert.deepEqual(rankedModelIds(gridSeries({ dead: {}, ifs: { 1: 40 } })), ['ifs']);
+});
+
+ok('the ramp is absolute, bounded, and gives rain its own band', () => {
+  for (const metric of ['all', 'temperature', 'wind', 'rain']) {
+    assert.equal(rampStep(-5, metric), 0);
+    assert.equal(rampStep(100, metric), RAMP_STEPS - 1);
+  }
+  // A rain F1 of 45 is a good rain forecast; the same number is a poor
+  // temperature score. Sharing one band would flatten every rain grid.
+  assert.equal(rampStep(45, 'rain'), 2);
+  assert.equal(rampStep(45, 'temperature'), 0);
 });
 
 // ── Aggregation invariants that v2 must not have moved ─────────────────────

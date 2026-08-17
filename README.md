@@ -59,7 +59,9 @@ node scripts/bake.mjs                      # score all preset cities + airports,
 score-v2 math (SEDI edge cases, the event gate folding back, the rain sample
 gate, a double-penalty fixture where a blurred forecast wins RMSE and loses the
 v2 score), the breakdown block's "null draws nothing, zero draws an empty
-track" rule, and the server payload's dual-score hydration in both directions.
+track" rule, the lead-time grid's ranking rules (short-horizon models can win a
+column but not the average) and its absolute colour bands, and the server
+payload's dual-score hydration in both directions.
 
 `bake.mjs` is optional. It precomputes the standings into `data/` and injects
 them into `index.html` so a fresh visit shows real numbers right away instead of
@@ -136,6 +138,31 @@ automatically; HRRR is excluded structurally (it duplicates GFS at short lead).
 - The ▲▼ movement compares today's ranking to the ranking from a week ago.
 - Rain win/loss and the form dots only look at next-day (day 1) forecasts. A
   form dot fills when that day's skill is 70 or higher.
+
+### "Skill by lead time" — the two views
+
+The card carries the app's two views over the same per-lead numbers, and the
+**grid is the default**. A preset board carries thirteen models; one line each is
+thirteen lines through the same few points of vertical space, and no palette
+separates them — the curve view could show the shape of the decay but never
+answer "who do I trust three days out".
+
+- **Grid** (`js/leadTimeGrid.js`) — models × lead-days, cell brightness = score.
+  Bands are absolute (`RAMP_BREAKS`: 50/60/70/80 for temperature and wind,
+  30/40/50/60 for rain, 45/55/65/75 for the combined skill), so a cell means the
+  same thing on every board and two cities can be compared by eye. Column headers
+  sort by that lead day; `avg` (or a second click) returns to the average, which
+  ranks full-coverage models above short-horizon ones and mutes the average of any
+  row that doesn't reach every column. `123` prints the numbers in the cells.
+- **Curves** (`leadTimeChart` in `js/charts.js`) — every model drawn, at most
+  `LEAD_FOCUS_LIMIT` (4) coloured, the rest in one context gray; coloured lines
+  are labelled where they end, and hovering the chart puts a crosshair on a lead
+  day with the top three at that horizon above it. Picking a fifth model drops the
+  oldest pick rather than doing nothing.
+
+The chosen view persists in `localStorage` (`verisky.leadView`). Both views read
+`buildLeadSeries` from `js/derive.js`, so they cannot disagree, and the grid's
+average ranking is what the curve view colours by default.
 
 ### Score model v2 (the anti-blur score)
 

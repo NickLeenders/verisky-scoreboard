@@ -322,6 +322,17 @@
             D-1-only model can score about 85 instead of being treated as a failed 7-day
             model; a perfect D-1…D-7 model can reach 100. Per-metric columns use the same
             weighting.</p>
+          <p><b>Skill by lead time</b> shows the numbers behind that weighting, in the app's two
+            views. The <b>grid</b> is a models × lead-days matrix: brightness is the score, so
+            reading down a column answers "who do I trust three days out" and reading across a row
+            shows the decay. Its bands are fixed (temperature and wind step at 50/60/70/80, rain at
+            30/40/50/60, since an F1 rain score genuinely lives lower), so a cell means the same
+            thing on every board. A blank cell is a lead day the model doesn't serve, and a model
+            that stops early gets a muted average — it is only being scored on the easy near days,
+            which is exactly why the column headers sort the grid too. The <b>curves</b> view draws
+            every model but colours at most four: a preset board carries thirteen, and thirteen
+            hues cannot be told apart, so the rest stay one context gray instead of pretending to
+            be readable.</p>
           <p><b>Rain W–L and form dots</b> are next-day (D-1) only, since "did it rain the next
             day" is the question most people care about. A win is a correct daily rain/no-rain
             call at 0.1&nbsp;mm; a form dot fills when that day's next-day skill ≥ 70.

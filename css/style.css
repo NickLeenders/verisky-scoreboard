@@ -479,6 +479,156 @@ th.c-metric, th.c-record { text-align: right; }
 .legend { display: flex; gap: 0.7rem; flex-wrap: wrap; }
 .legend-item { color: var(--text-2); font-size: 0.78rem; }
 
+.lead-views {
+  display: inline-flex;
+  background: var(--surface-mid);
+  border-radius: 999px;
+  padding: 2px;
+}
+.lead-views button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+.lead-views button svg { width: 10px; height: 10px; }
+.lead-views button.active { background: var(--accent); color: #04101f; }
+
+.lead-hint { color: var(--text-3); font-size: 0.76rem; margin: 0.5rem 0 0; min-height: 1.1em; }
+
+/* The cell ramp: one hue, dark = weak, bright = strong. Lightness is monotone,
+   each step clears a visible gap, and the ink on each step stays legible on it
+   (light on the two dark steps, near-black on the three bright ones). */
+.ramp-0 { background: #33497a; }
+.ramp-1 { background: #3d64ab; }
+.ramp-2 { background: #4a80dd; }
+.ramp-3 { background: #619cff; }
+.ramp-4 { background: #94bcff; }
+.ramp-0 .lg-num, .ramp-1 .lg-num { color: #f2f6fc; }
+.ramp-2 .lg-num, .ramp-3 .lg-num, .ramp-4 .lg-num { color: #0b101c; }
+
+.lead-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+}
+.ramp-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-3);
+  font-size: 0.7rem;
+}
+.ramp-step { width: 14px; height: 8px; border-radius: 2px; }
+.numbers-toggle {
+  background: var(--surface-mid);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  cursor: pointer;
+}
+.numbers-toggle.on { border-color: var(--accent); color: var(--accent); }
+
+.lead-grid { display: grid; gap: 2px; }
+.lg-row {
+  display: grid;
+  grid-template-columns: 6rem repeat(var(--lg-cols), minmax(0, 1fr)) 1.7rem;
+  align-items: center;
+  gap: 2px;
+}
+.lg-head { margin-bottom: 2px; }
+.lg-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: 0.72rem;
+  padding-right: 0.25rem;
+}
+/* The dot identifies the model in the curve view too, so it never gets squeezed
+   out to buy room for the name — a long name ellipsises instead. */
+.lg-label .mdot { flex: none; }
+.lg-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lg-col {
+  background: none;
+  border: 0;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0;
+  cursor: pointer;
+}
+.lg-col-on { color: var(--accent); }
+.lg-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+}
+.lg-empty { background: rgba(148, 163, 184, 0.06); cursor: default; }
+.lg-cell-on { outline: 1.5px solid var(--text); outline-offset: -1.5px; }
+.lg-num { font-size: 0.66rem; font-weight: 700; }
+.lg-avg { font-size: 0.72rem; font-weight: 700; text-align: right; }
+.lg-avg-partial { color: var(--text-3); font-weight: 400; }
+.lg-avg-head { text-align: right; }
+
+.lead-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 0.5rem; }
+.lead-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--surface-mid);
+  border: 1px solid transparent;
+  border-radius: 16px;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+}
+.lead-chip.on { background: var(--surface-light); border-color: var(--grid); color: var(--text); }
+
+.lead-readout {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+  background: var(--surface-mid);
+  border-radius: 8px;
+  padding: 0.3rem 0.55rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.76rem;
+  color: var(--text-2);
+  min-height: 1.6rem;
+}
+.lead-readout:empty { display: none; }
+.ro-lead { color: var(--text); font-weight: 700; }
+.ro-item { display: inline-flex; align-items: center; gap: 0.25rem; }
+.ro-item b { color: var(--text); }
+.lead-chart { cursor: crosshair; }
+
 /* ── Other-calls strip ───────────────────────────────────────────────────── */
 
 .strip {

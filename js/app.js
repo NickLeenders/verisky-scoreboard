@@ -27,7 +27,23 @@ import {
   buildOtherCalls,
   LAB_LEADS,
 } from './derive.js';
-import { leadTimeChart, receiptRainChart, receiptLineChart, ghostChart, medianChart } from './charts.js';
+import {
+  leadTimeChart,
+  leadDayAtClientX,
+  LEAD_FOCUS_LIMIT,
+  receiptRainChart,
+  receiptLineChart,
+  ghostChart,
+  medianChart,
+} from './charts.js';
+import {
+  buildLeadTimeGrid,
+  sortLeadTimeGrid,
+  rankedModelIds,
+  rampStep,
+  formatLeadLabel,
+  RAMP_STEPS,
+} from './leadTimeGrid.js';
 import { breakdownHtml, hasBreakdown } from './breakdown.js';
 import {
   unitSystem,
@@ -524,6 +540,18 @@ function renderReceipt(aligned, hasCommercialStandings = false) {
 
 // ── Skill by lead time ───────────────────────────────────────────────────────
 
+/**
+ * Two views over the same numbers, ported from the app's ScoreLeadTimeCard.
+ *
+ * The grid is the default. A preset board carries thirteen models, and one line
+ * each is thirteen lines through the same few points of vertical space — no
+ * palette can separate them, so the chart could show the shape of the decay but
+ * never answer "who do I trust three days out". The grid answers exactly that by
+ * reading down a column, and a fourteenth provider costs one more row.
+ *
+ * The curves stay for reading the decay *shape*, with the app's honest ceiling:
+ * at most four models coloured at a time, everything else in one context gray.
+ */
 const LEAD_TABS = [
   ['all', 'Skill'],
   ['temperature', 'Temp'],
@@ -531,39 +559,271 @@ const LEAD_TABS = [
   ['wind', 'Wind'],
 ];
 
+const LEAD_VIEW_KEY = 'verisky.leadView';
+/** Models coloured in the curve view before the reader picks any. */
+const LEAD_DEFAULT_FOCUS = 3;
+/** Lead day the curve readout opens on: tomorrow, the horizon most people plan for. */
+const LEAD_DEFAULT_CURSOR = 1;
+
+const VIEW_ICONS = {
+  grid: '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path fill="currentColor" '
+    + 'd="M0 0h5v5H0zM7 0h5v5H7zM0 7h5v5H0zM7 7h5v5H7z"/></svg>',
+  curves: '<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path fill="none" '
+    + 'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" '
+    + 'd="M0.8 9.6 4 5.4l2.6 2.2L11.2 1.8"/></svg>',
+};
+
+// Card state lives outside the render so a refresh (or a unit switch) never
+// forgets which view the reader chose, which models they coloured, or how they
+// sorted the grid.
+let leadView = 'grid';
+let leadMetric = 'all';
+let leadFocus = null; // null = follow the data (the leaders)
+let leadSort = 'average'; // 'average' or a column index
+let leadNumbers = false;
+let leadCursorDay = null;
+let leadSelectedCell = null; // { modelId, day } — the cell the reader tapped
+
+try {
+  const saved = localStorage.getItem(LEAD_VIEW_KEY);
+  if (saved === 'grid' || saved === 'curves') leadView = saved;
+} catch { /* private mode: the default view is fine */ }
+
 function renderLead(scores) {
   const container = $('#lead-body');
-  const series = buildLeadSeries(scores);
-
-  const legend = scores.roster.map(
-    (m) => `<span class="legend-item"><span class="mdot" style="background:${esc(m.color)}"></span>${esc(m.label)}</span>`,
-  ).join('');
+  const allSeries = buildLeadSeries(scores);
 
   container.innerHTML = `
     <div class="lead-head">
       <span class="metric-tabs" role="tablist">
-        ${LEAD_TABS.map(([key, label], i) => `<button type="button" role="tab" data-metric="${key}"
-          class="${i === 0 ? 'active' : ''}">${label}</button>`).join('')}
+        ${LEAD_TABS.map(([key, label]) => `<button type="button" role="tab" data-metric="${key}"
+          class="${key === leadMetric ? 'active' : ''}">${label}</button>`).join('')}
       </span>
-      <span class="legend">${legend}</span>
+      <span class="lead-views" role="tablist">
+        ${Object.entries(VIEW_ICONS).map(([view, icon]) => `<button type="button" role="tab"
+          data-view="${view}" class="${view === leadView ? 'active' : ''}"
+          aria-selected="${view === leadView}">${icon}${view === 'grid' ? 'Grid' : 'Curves'}</button>`).join('')}
+      </span>
     </div>
-    <div class="lead-chart"></div>
-    <p class="chart-caption">the Skill column is the 1/d-weighted score from this curve,
-      with a soft horizon adjustment. This chart is the receipt for the ranking.
-      ICON's line stops at day 6 (its usable horizon).</p>`;
+    <div class="lead-view"></div>
+    <p class="chart-caption"></p>`;
 
-  const draw = (metric) => {
-    const s = series[metric] ?? [];
-    container.querySelector('.lead-chart').innerHTML =
-      s.length > 0 ? leadTimeChart(s) : '<p class="empty">not scored this window</p>';
+  const body = container.querySelector('.lead-view');
+  const caption = container.querySelector('.chart-caption');
+
+  const draw = () => {
+    const series = allSeries[leadMetric] ?? [];
+    if (series.length === 0) {
+      body.innerHTML = '<p class="empty">not scored this window</p>';
+      caption.textContent = '';
+      return;
+    }
+    if (leadView === 'grid') {
+      drawLeadGrid(body, series);
+      caption.innerHTML = 'Brightness is the score at that lead day, on fixed bands — a cell means '
+        + 'the same thing on every board. A blank cell is a lead day the model doesn\'t serve, and '
+        + 'a muted average is a row that only covers the near days. The Skill column is the '
+        + '1/d-weighted mean of a row, with a soft horizon adjustment.';
+    } else {
+      drawLeadCurves(body, series);
+      caption.innerHTML = 'The same numbers as the grid, as decay shapes. Only the models you pick '
+        + 'are coloured: thirteen hues cannot be told apart, so the rest stay one context gray '
+        + 'rather than pretend to be readable.';
+    }
   };
-  draw('all');
+  draw();
 
   for (const btn of container.querySelectorAll('.metric-tabs button')) {
     btn.addEventListener('click', () => {
       for (const b of container.querySelectorAll('.metric-tabs button')) b.classList.remove('active');
       btn.classList.add('active');
-      draw(btn.dataset.metric);
+      leadMetric = btn.dataset.metric;
+      leadSelectedCell = null;
+      draw();
+    });
+  }
+  for (const btn of container.querySelectorAll('.lead-views button')) {
+    btn.addEventListener('click', () => {
+      for (const b of container.querySelectorAll('.lead-views button')) {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      }
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+      leadView = btn.dataset.view;
+      try {
+        localStorage.setItem(LEAD_VIEW_KEY, leadView);
+      } catch { /* private mode: the choice just doesn't persist */ }
+      draw();
+    });
+  }
+}
+
+/** models × lead-days matrix — the default view. */
+function drawLeadGrid(body, series) {
+  const grid = buildLeadTimeGrid(series);
+  if (grid.columns.length === 0) {
+    body.innerHTML = '<p class="empty">not scored this window</p>';
+    return;
+  }
+  const rows = sortLeadTimeGrid(grid, leadSort);
+  const ramp = Array.from({ length: RAMP_STEPS }, (_, i) => `<i class="ramp-step ramp-${i}"></i>`).join('');
+
+  const head = `<div class="lg-row lg-head">
+    <span class="lg-label"></span>
+    ${grid.columns.map((day, index) => `<button type="button" class="lg-col${leadSort === index ? ' lg-col-on' : ''}"
+      data-col="${index}" title="rank the models at ${formatLeadLabel(day)}">${formatLeadLabel(day)}</button>`).join('')}
+    <button type="button" class="lg-col lg-avg-head${leadSort === 'average' ? ' lg-col-on' : ''}"
+      data-col="average" title="rank the models by their average">avg</button>
+  </div>`;
+
+  const cells = rows.map((row) => {
+    const inner = row.cells.map((score, index) => {
+      const day = grid.columns[index];
+      if (score == null) {
+        return `<span class="lg-cell lg-empty" role="img"
+          aria-label="${esc(row.model.label)}: no score at ${formatLeadLabel(day)}"></span>`;
+      }
+      const on = leadSelectedCell?.modelId === row.model.id && leadSelectedCell?.day === day;
+      return `<button type="button" class="lg-cell ramp-${rampStep(score, leadMetric)}${on ? ' lg-cell-on' : ''}"
+        data-model="${esc(row.model.id)}" data-day="${day}" data-score="${Math.round(score)}"
+        aria-label="${esc(row.model.label)} at ${formatLeadLabel(day)}: score ${Math.round(score)}"
+        >${leadNumbers ? `<span class="num lg-num">${Math.round(score)}</span>` : ''}</button>`;
+    }).join('');
+    // A model that stops early is averaging only its easy near leads, so its
+    // number is muted: it explains the row's rank without pretending to be
+    // comparable with a model carrying the full week.
+    return `<div class="lg-row">
+      <span class="lg-label" title="${esc(row.model.label)} · ${esc(row.model.provider)}">
+        <span class="mdot" style="background:${esc(row.model.color)}"></span>
+        <span class="lg-name">${esc(row.model.label)}</span></span>
+      ${inner}
+      <span class="num lg-avg${row.fullCoverage ? '' : ' lg-avg-partial'}">${
+      row.average == null ? '' : Math.round(row.average)}</span>
+    </div>`;
+  }).join('');
+
+  const hint = leadSelectedCell
+    ? describeLeadCell(rows, grid.columns, leadSelectedCell)
+    : 'Click a cell for the exact score · click a lead day to rank the models there';
+
+  body.innerHTML = `
+    <div class="lead-tools">
+      <span class="ramp-legend">weak ${ramp} strong</span>
+      <button type="button" class="numbers-toggle${leadNumbers ? ' on' : ''}"
+        aria-pressed="${leadNumbers}" title="show the scores as numbers">123</button>
+    </div>
+    <div class="lead-grid" style="--lg-cols:${grid.columns.length}">${head}${cells}</div>
+    <p class="lead-hint" aria-live="polite">${esc(hint)}</p>`;
+
+  const redraw = () => drawLeadGrid(body, series);
+  body.querySelector('.numbers-toggle').addEventListener('click', () => {
+    leadNumbers = !leadNumbers;
+    redraw();
+  });
+  for (const btn of body.querySelectorAll('.lg-col')) {
+    btn.addEventListener('click', () => {
+      const col = btn.dataset.col;
+      const next = col === 'average' ? 'average' : Number(col);
+      leadSort = leadSort === next ? 'average' : next;
+      redraw();
+    });
+  }
+  for (const btn of body.querySelectorAll('.lg-cell[data-model]')) {
+    btn.addEventListener('click', () => {
+      leadSelectedCell = { modelId: btn.dataset.model, day: Number(btn.dataset.day) };
+      redraw();
+    });
+  }
+}
+
+function describeLeadCell(rows, columns, selected) {
+  const row = rows.find((r) => r.model.id === selected.modelId);
+  const index = columns.indexOf(selected.day);
+  const score = index >= 0 ? row?.cells[index] : null;
+  if (score == null) return 'Click a cell for the exact score · click a lead day to rank the models there';
+  const metric = LEAD_TABS.find(([key]) => key === leadMetric)?.[1] ?? 'Skill';
+  return `${row.model.label} at ${formatLeadLabel(selected.day)} · ${metric.toLowerCase()} ${Math.round(score)}`;
+}
+
+/** The decay curves — every model drawn, at most four coloured. */
+function drawLeadCurves(body, series) {
+  const ranked = rankedModelIds(series);
+  // Picks are kept across city switches, but a pick this board has no row for
+  // cannot be coloured. Everything the reader chose being absent (a different
+  // country's roster) falls back to the leaders rather than an all-gray chart;
+  // an empty list they emptied themselves is left alone.
+  const present = new Set(series.map((s) => s.model.id));
+  const picked = leadFocus?.filter((id) => present.has(id)) ?? null;
+  const focus = picked == null || (leadFocus.length > 0 && picked.length === 0)
+    ? ranked.slice(0, LEAD_DEFAULT_FOCUS)
+    : picked;
+  const days = [...new Set(series.flatMap((s) => s.points.map((p) => p.day)))].sort((a, b) => a - b);
+  if (days.length === 0) {
+    body.innerHTML = '<p class="empty">not scored this window</p>';
+    return;
+  }
+  const snap = (day) => days.reduce((best, d) => (Math.abs(d - day) < Math.abs(best - day) ? d : best));
+  const cursor = snap(leadCursorDay ?? LEAD_DEFAULT_CURSOR);
+
+  const chips = series.map((s) => {
+    const on = focus.includes(s.model.id);
+    return `<button type="button" class="lead-chip${on ? ' on' : ''}" data-model="${esc(s.model.id)}"
+      aria-pressed="${on}"><span class="mdot" style="background:${on ? esc(s.model.color) : 'var(--text-3)'}"></span>${
+      esc(s.model.label)}</button>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="lead-chips">${chips}</div>
+    <div class="lead-readout"></div>
+    <div class="lead-chart"></div>
+    <p class="lead-hint">Hover the chart to read one lead day · click models to colour them
+      (up to ${LEAD_FOCUS_LIMIT})</p>`;
+
+  const chartEl = body.querySelector('.lead-chart');
+  const readoutEl = body.querySelector('.lead-readout');
+
+  const paint = (day) => {
+    chartEl.innerHTML = leadTimeChart(series, { focusIds: focus, cursorDay: day });
+    // The ranking at the crosshair — the exact answer tangled lines cannot give.
+    const top = series
+      .map((s) => ({ model: s.model, score: s.points.find((p) => p.day === day)?.score ?? null }))
+      .filter((entry) => entry.score != null)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+    readoutEl.innerHTML = top.length === 0 ? '' : `<span class="ro-lead">${formatLeadLabel(day)}</span>${
+      top.map((entry) => `<span class="ro-item"><span class="mdot" style="background:${esc(entry.model.color)}"></span>${
+        esc(entry.model.label)} <b class="num">${Math.round(entry.score)}</b></span>`).join('')}`;
+  };
+  paint(cursor);
+
+  const moveCursor = (clientX) => {
+    const svg = chartEl.querySelector('svg');
+    if (!svg) return;
+    const day = leadDayAtClientX(svg, clientX);
+    if (day == null) return;
+    const snapped = snap(day);
+    if (snapped === leadCursorDay) return;
+    leadCursorDay = snapped;
+    paint(snapped);
+  };
+  // A pointer that hovers reads the chart by hovering it. A finger has to tap:
+  // following pointermove on touch would hijack the page scroll that starts on
+  // the chart, so touch only moves the crosshair on a deliberate press.
+  chartEl.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'touch') return;
+    moveCursor(event.clientX);
+  });
+  chartEl.addEventListener('pointerdown', (event) => moveCursor(event.clientX));
+
+  for (const chip of body.querySelectorAll('.lead-chip')) {
+    chip.addEventListener('click', () => {
+      const id = chip.dataset.model;
+      // The oldest pick makes way, so a click never silently does nothing.
+      leadFocus = focus.includes(id)
+        ? focus.filter((f) => f !== id)
+        : [...focus, id].slice(-LEAD_FOCUS_LIMIT);
+      drawLeadCurves(body, series);
     });
   }
 }
