@@ -269,20 +269,50 @@
       <details>
         <summary>How scoring works</summary>
         <div class="method-body">
-          <p><b>Per-lead scores (0 to 100)</b> use the same formulas as the VeriSky app, with the
-            error caps tuned for this board, on hourly forecast/observation pairs over the last 30 days:</p>
+          <p><b>Per-lead scores (0 to 100)</b> use the same formulas as the VeriSky app, on hourly
+            forecast/observation pairs over the last 30 days. Temperature and wind are each a
+            blend of two components,
+            <code>0.7&nbsp;·&nbsp;Accuracy&nbsp;+&nbsp;0.3&nbsp;·&nbsp;Extremes</code>; open any
+            row to see the split.</p>
           <ul>
-            <li><b>Temperature:</b> RMSE mapped to a 0 to 100 scale with a 6.5&nbsp;°C cap.
-              <code>score&nbsp;=&nbsp;(1&nbsp;−&nbsp;RMSE/6.5)·100</code>, floored at 0.</li>
-            <li><b>Wind:</b> normalized RMSE, where the cap scales with local wind climate
-              (<code>max(14&nbsp;km/h, 60% of mean observed wind)</code>), so windy coasts are judged
-              on relative error rather than raw km/h.</li>
+            <li><b>Accuracy</b> is the share of hours the forecast landed inside a meaningful
+              band: within <b>2&nbsp;°C</b> for temperature, within
+              <code>max(5&nbsp;km/h, 20%)</code> for wind. Beyond the band a 3&nbsp;°C miss and a
+              9&nbsp;°C miss cost the same.</li>
+            <li><b>Extremes</b> is <a href="https://doi.org/10.1175/WAF-D-10-05030.1">SEDI</a>, an
+              event score computed over the hours that were unusual <i>for this location</i>
+              (a temperature anomaly or a wind speed beyond roughly the local 90th percentile,
+              with floors of 3&nbsp;°C and 20&nbsp;km/h). It counts <b>false alarms</b> as well
+              as catches, so a model cannot win it by crying wolf. A calm window has no extremes
+              to judge: the component needs at least 8 event and 8 quiet hours, and where it has
+              fewer, its weight folds back into Accuracy.</li>
             <li><b>Rain:</b> F1 of rain/no-rain calls at a 0.1&nbsp;mm/h threshold with a
               0.1&nbsp;mm deadband (drizzle right at the threshold is a coin flip, not skill).
               Rain is only scored when the window had a genuine rain signal
               (≥&nbsp;3 rain-event hours totalling ≥&nbsp;1&nbsp;mm), since otherwise every model
-              would ace a dry month.</li>
+              would ace a dry month, and only for models whose own sample holds at least 8
+              observed wet hours.</li>
+            <li><b>Sharpness</b> (in the expanded row, deliberately <i>not</i> in the score) is
+              how much the forecast series moves compared with the observed one. 1.0× moves like
+              the weather; a much lower number is a forecast hedging toward an average. It stays
+              out of the headline because it is a property, not an accuracy: scoring it would
+              just invite the opposite game.</li>
           </ul>
+          <p><b>Why not RMSE?</b> Root-mean-square error, which this board used until
+            August 2026, is minimized by the conditional mean — so a model that hedges toward a
+            smooth average is playing the metric optimally, and a sharp forecast that is slightly
+            off in time or place is punished twice (a miss <i>and</i> a false alarm) where a
+            blurred one is punished once. That is the documented reason MSE-trained AI models can
+            top an error leaderboard while looking like a blurry mess on a map
+            (<a href="https://doi.org/10.1175/BAMS-D-23-0162.1">Ben Bouallègue et al. 2024</a>,
+            <a href="https://doi.org/10.1029/2023GL107377">Bonavita 2024</a>). Scoring only the
+            hours where something happened is not the fix either — selecting hours on the
+            observations rewards whoever over-forecasts drama
+            (<a href="https://doi.org/10.1214/16-STS588">Lerch et al. 2017</a>) — which is why
+            Extremes is a contingency table with false alarms in it. The old error score is still
+            computed: each expanded row says where the model would have ranked under it, and the
+            <a href="history.html">long-term trends</a> page still charts it, because a
+            five-year comparison needs a yardstick that cannot move with the season.</p>
           <p><b>The headline Skill number</b> is a soft horizon-adjusted score. First,
             each model gets its 1/d-weighted score over the lead days it actually serves.
             Then that score is multiplied by <code>0.75&nbsp;+&nbsp;0.25·C</code>, where

@@ -28,6 +28,7 @@ import {
   LAB_LEADS,
 } from './derive.js';
 import { leadTimeChart, receiptRainChart, receiptLineChart, ghostChart, medianChart } from './charts.js';
+import { breakdownHtml, hasBreakdown } from './breakdown.js';
 import {
   unitSystem,
   setUnitSystem,
@@ -89,6 +90,7 @@ function urlForCity(city) {
 let currentCity = null;
 let loadToken = 0;
 let lastRender = null; // { aligned, scores } for the lab panels
+let lastRows = []; // the standings rows on screen — the lab reads its breakdown from these
 // ?lab=<modelId> deep link — captured at boot (loadCity rewrites the URL),
 // consumed by the first render only.
 let pendingLab = new URLSearchParams(location.search).get('lab');
@@ -236,6 +238,7 @@ function renderStandings(aligned, scores, presetBoard) {
   const rows = presetBoard?.rows ?? buildStandings(aligned, scores);
   const shownScores = presetBoard?.scores ?? scores;
   const rainOff = !shownScores.rainEligibility.rainScoreEligible;
+  lastRows = rows;
 
   const html = [`<table class="standings"><thead><tr>
     <th class="c-rank">#</th><th class="c-move" title="movement vs the standings a week ago (same window minus its last 7 days)"></th>
@@ -246,8 +249,12 @@ function renderStandings(aligned, scores, presetBoard) {
   </tr></thead><tbody>`];
 
   for (const r of rows) {
-    const canOpenLab = Object.values(aligned.pairs[r.model.id] ?? {})
+    // Commercial models have no in-browser pairs, so their row used to be
+    // inert. It still opens: the score breakdown comes from the server's
+    // aggregate components, and the charts below it are simply omitted.
+    const hasPairs = Object.values(aligned.pairs[r.model.id] ?? {})
       .some((pairs) => Array.isArray(pairs) && pairs.length > 0);
+    const canOpenLab = hasPairs || hasBreakdown(r);
     const move =
       r.movement == null ? '<span class="move move-flat">—</span>'
         : r.movement > 0 ? `<span class="move move-up">▲${r.movement > 1 ? r.movement : ''}</span>`
@@ -260,7 +267,8 @@ function renderStandings(aligned, scores, presetBoard) {
       `<td class="num c-metric tone-${scoreTone(v)}">${fmt(v)}</td>`;
     html.push(`<tr class="standing${canOpenLab ? '' : ' standing-static'}" data-model="${esc(r.model.id)}"
         data-lab="${canOpenLab ? '1' : '0'}"${canOpenLab
-          ? ' tabindex="0" role="button" aria-expanded="false" title="click to open the lab"'
+          ? ` tabindex="0" role="button" aria-expanded="false" title="click for the score breakdown${
+            hasPairs ? ' and the lab' : ''}"`
           : ''}>
       <td class="c-rank num">${r.rank}</td>
       <td class="c-move">${move}</td>
@@ -280,6 +288,17 @@ function renderStandings(aligned, scores, presetBoard) {
     html.push(
       `<p class="foot-note">* rain not scored: the window was too dry for rain calls to mean anything ` +
       `(${shownScores.rainEligibility.rainEventHours} rain-event hours, ${fmtRain(shownScores.rainEligibility.rainEventTotalMm)} ${rainUnit()}).</p>`,
+    );
+  }
+  // The server banks the v2 counters forward from the day the new score model
+  // went live, so a 30-day window can judge temperature and wind over fewer
+  // days than rain until it fills. Say so rather than let the window label lie.
+  const covered = presetBoard?.v2CoveredDays;
+  if (covered != null && presetBoard.scoredDays && covered < presetBoard.scoredDays) {
+    html.push(
+      `<p class="foot-note">Accuracy and Extremes cover the last ${covered} of ` +
+      `${presetBoard.scoredDays} days — the new score model started banking on ` +
+      `2026-08-10 and fills forward a day at a time. Rain uses the full window.</p>`,
     );
   }
   const container = $('#standings-body');
@@ -324,9 +343,26 @@ function toggleLab(tr) {
 
 function buildLabPanel(labRow, modelId) {
   const { aligned, scores } = lastRender;
-  const model = aligned.roster.find((m) => m.id === modelId);
+  const row = lastRows.find((r) => r.model.id === modelId);
+  const model = aligned.roster.find((m) => m.id === modelId) ?? row?.model;
   const served = LAB_LEADS.filter((d) => aligned.pairs[modelId]?.[d]);
   const lab = labRow.querySelector('.lab');
+
+  // The breakdown always renders when the row carries components; the charts
+  // below it need in-browser pairs, which commercial models never have.
+  const breakdown = row ? breakdownHtml(row) : '';
+  if (served.length === 0) {
+    lab.innerHTML = `
+      <div class="lab-head">
+        <span class="lab-title"><span class="mdot" style="background:${esc(model.color)}"></span>
+          ${esc(model.label)} · score breakdown</span>
+      </div>
+      ${breakdown}
+      <p class="chart-caption">forecast-vs-observed charts are public models only — this
+        provider's forecast values never reach the browser, only its aggregate scores.</p>`;
+    lab.addEventListener('click', (e) => e.stopPropagation());
+    return;
+  }
 
   const habits = buildHabits(aligned, scores, modelId);
   const medianPts = buildMedianComparison(scores, modelId);
@@ -340,6 +376,7 @@ function buildLabPanel(labRow, modelId) {
           class="${d === served[0] ? 'active' : ''}">D-${d}</button>`).join('')}
       </span>
     </div>
+    ${breakdown}
     <div class="lab-grid">
       <div class="lab-ghost">
         <div class="ghost-chart"></div>

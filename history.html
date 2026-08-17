@@ -89,10 +89,9 @@
               bold line is a <b>trailing 12-month average</b> that cancels the seasonal cycle;
               the faint dots are the raw monthly values. Switch <b>View</b> to see the monthly
               numbers directly.</li>
-            <li><b>Combined</b> and <b>Rain</b> use the board's 0–100 skill scores
-              (<i>higher is better</i>) — Combined is the lead-weighted headline skill, Rain is
-              the F1 of rain/no-rain calls. Rain has gaps in dry months, where there is no rain
-              signal to score.</li>
+            <li><b>Combined</b> and <b>Rain</b> use 0–100 skill scores (<i>higher is better</i>)
+              — Combined is the lead-weighted headline, Rain is the F1 of rain/no-rain calls.
+              Rain has gaps in dry months, where there is no rain signal to score.</li>
             <li><b>Lead</b> picks the forecast horizon: <b>D-1</b> is "what it said 24 h ahead",
               up to <b>D-7</b>. <b>All</b> combines horizons (1/d-weighted).</li>
             <li><b>View → Yearly</b> overlays one model's calendar years on a Jan–Dec axis
@@ -103,6 +102,14 @@
               headline compares the latest year to the same calendar months of all earlier
               years, so a partial year is never judged against other years' winters.</li>
           </ul>
+          <p><b>This page uses the error-based score, the live board does not.</b> The
+            scoreboard's headline is now score v2, where temperature and wind are a tolerance
+            hit rate plus an extreme-event score rather than RMSE. That score defines "extreme"
+            against a location's own climate, and a single month can only measure that from
+            itself, so the yardstick would drift with the season and a five-year line would be
+            partly a chart of its own thresholds. A fixed RMSE cap is the same ruler in 2021 as
+            in 2026, which is what a trend needs — so every month here, old and new, is the
+            error score, and the numbers are not comparable with the live board's.</p>
           <p>Two honest caveats. The <code>best_match</code> truth series' own composition can
             shift over the years, so a trend partly reflects the yardstick, not only the model.
             And these are "seamless" products — a rising or falling line includes the model

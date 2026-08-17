@@ -381,6 +381,58 @@ th.c-metric, th.c-record { text-align: right; }
 .habits li { margin: 0.2rem 0; }
 .habits-none { color: var(--text-3); font-size: 0.8rem; margin: 0.6rem 0 0; }
 
+/* ── Score breakdown (the v2 components behind a row's headline) ─────────── */
+
+.breakdown {
+  background: var(--surface-mid);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem 0.7rem;
+  margin-bottom: 0.8rem;
+}
+.bd-head { font-size: 0.8rem; color: var(--text-2); margin-bottom: 0.55rem; }
+.bd-head-sub { color: var(--text-3); font-size: 0.74rem; margin-left: 0.4rem; }
+.bd-grid { display: grid; gap: 0.7rem 1.1rem; grid-template-columns: 1fr; }
+@media (min-width: 700px) {
+  .bd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1050px) {
+  .bd-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.bd-metric-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--surface-light);
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.4rem;
+}
+.bd-metric-name { font-size: 0.8rem; color: var(--text); }
+.bd-metric-score { font-size: 0.95rem; }
+.bd-cell { margin: 0.4rem 0 0; }
+.bd-label {
+  display: inline-block;
+  min-width: 5.4rem;
+  font-size: 0.72rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.bd-value { font-size: 0.82rem; }
+/* A track is drawn only where a component measured something: an empty track
+   means a measured zero, no track at all means "not measured". */
+.bd-track {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-light);
+  margin: 0.25rem 0 0.2rem;
+  overflow: hidden;
+}
+.bd-track-fill { display: block; height: 100%; border-radius: 2px; }
+.bd-sub { display: block; color: var(--text-3); font-size: 0.73rem; line-height: 1.35; }
+.bd-note { color: var(--text-3); font-size: 0.76rem; margin: 0.55rem 0 0; }
+
 /* ── Receipt ─────────────────────────────────────────────────────────────── */
 
 .receipt-head {

@@ -37,6 +37,11 @@ jobs:
         with:
           node-version: 20
 
+      # Offline checks of the scoring math, the breakdown block's guards and
+      # the server payload's dual-score hydration. No network, seconds to run.
+      - name: Check scoring
+        run: node scripts/check.mjs
+
       # Fetch + score every city live, in Node. Exits non-zero only if ALL
       # cities fail, which keeps the last good deployment in place.
       - name: Bake scores

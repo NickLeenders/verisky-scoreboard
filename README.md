@@ -4,6 +4,9 @@ A static web scoreboard that ranks public and commercial weather models by how
 accurate their forecasts turned out to be over the last 30 days. Public-model
 data comes from Open-Meteo; preset cities add server-computed aggregate scores
 for Apple Weather, OpenWeatherMap, WeatherAPI, Visual Crossing, and Foreca.
+Models are ranked on the app's **score v2** — a tolerance hit rate plus an
+extreme-event score rather than RMSE, so a forecast cannot climb the table by
+hedging toward an average (see [Score model v2](#score-model-v2-the-anti-blur-score)).
 There's no
 build step or framework, just ES modules and plain HTML and CSS.
 
@@ -46,10 +49,17 @@ measurement point.
 You can also run the scoring outside the browser with Node 18+:
 
 ```sh
+node scripts/check.mjs                     # offline checks (scoring math, breakdown, payload)
 node scripts/smoke.mjs amsterdam           # score one city and print the standings
 node scripts/smoke.mjs amsterdam-airport   # same pipeline at the airport station
 node scripts/bake.mjs                      # score all preset cities + airports, write data/*.json
 ```
+
+`check.mjs` needs no network and runs in CI before the bake. It covers the
+score-v2 math (SEDI edge cases, the event gate folding back, the rain sample
+gate, a double-penalty fixture where a blurred forecast wins RMSE and loses the
+v2 score), the breakdown block's "null draws nothing, zero draws an empty
+track" rule, and the server payload's dual-score hydration in both directions.
 
 `bake.mjs` is optional. It precomputes the standings into `data/` and injects
 them into `index.html` so a fresh visit shows real numbers right away instead of
@@ -126,3 +136,45 @@ automatically; HRRR is excluded structurally (it duplicates GFS at short lead).
 - The ▲▼ movement compares today's ranking to the ranking from a week ago.
 - Rain win/loss and the form dots only look at next-day (day 1) forecasts. A
   form dot fills when that day's skill is 70 or higher.
+
+### Score model v2 (the anti-blur score)
+
+Since **2026-08-17** the headline is the VeriSky app's **score v2**, matching
+the app release (`docs/design/score-v2.md` in the app repo). Temperature and
+wind are no longer RMSE: each is `0.7 · Accuracy + 0.3 · Extremes`.
+
+- **Accuracy** — share of hours inside a tolerance band (2 °C; wind
+  `max(5 km/h, 20%)`). Beyond the band, a 3 °C miss and a 9 °C miss cost the
+  same, so hedging toward the mean stops buying points.
+- **Extremes** — SEDI over a 2×2 table of hours that were unusual *for this
+  location*, false alarms included. Needs ≥ 8 event and ≥ 8 quiet hours; below
+  that the weight folds back into Accuracy, so a calm window is not penalised.
+- **Sharpness** — σ(forecast)/σ(observed), shown in the expanded row and
+  deliberately kept out of the score.
+- **Rain and the aggregation are unchanged**, except that a model's rain is
+  only scored when its own sample holds ≥ 8 observed wet hours.
+
+RMSE keeps being computed as `errorScore`. Every expanded row says where the
+model would have ranked under it, `js/derive.js` ranks it, and
+`scripts/history-backfill.mjs` charts it — see below.
+
+Both ends carry the two score models **side by side**, and nothing negotiates a
+version:
+
+- `/scoreboard/v1/<preset>.json` still answers `version: 1` with the v1
+  `skill`/`metricSkill`/`perLead`, and adds `skillV2`, `metricSkillV2`,
+  `perLeadV2`, `components`, `movementV2`, `formDotsV2` and `v2CoveredDays`.
+  The v2 fields are absent until the cell has banked 7 days of counters, so
+  either end can be deployed first.
+- `js/server-scoreboard.js` prefers v2 field by field and falls back to v1,
+  then re-ranks by whatever it ended up showing.
+- In the browser, event thresholds come from the scored window itself rather
+  than a 90-day climatology (the app's documented on-device fallback), so the
+  numbers for a searched location can differ slightly from a preset city's
+  server-computed ones.
+
+**`history.html` deliberately stays on the error score.** v2 defines "extreme"
+against a location's climate, and a one-month bucket can only derive that from
+itself, so the yardstick would drift with the season and a five-year line would
+partly chart its own thresholds. The committed history series is therefore all
+v1, old months and new alike, and is not comparable with the live board.

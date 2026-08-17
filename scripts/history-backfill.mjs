@@ -178,10 +178,24 @@ async function getPredChunk(city, model, ym) {
 
 // ── Score one model over one month (reusing the live align + score) ───────────
 /**
+ * The trend page deliberately charts the **error-based (v1) score**, which the
+ * live board retired in favour of score v2 (Accuracy + Extremes) — see
+ * `SCORE_FIELD`.
+ *
+ * v2's Extremes component is defined against the location's own climate, and a
+ * single month can only derive that from the month it is scoring, so the
+ * yardstick would move with the season and a five-year line would measure the
+ * thresholds as much as the models. RMSE through a fixed cap is the same ruler
+ * in January 2021 and in August 2026, which is what a "have the models
+ * degraded?" chart needs. Nothing here mixes the two: every month in the
+ * committed series, old and new, is the error score.
+ *
  * @returns null if the month has no usable data for the model, else
  * { skill, metricSkill:{temperature,rain,wind}, leads: { <day>: {t,w,r} } }
  * where t/w = {score,rmse,bias,n}, r = {f1,n}.
  */
+const SCORE_FIELD = 'errorScore';
+
 function scoreModelMonth(model, truth, predChunk, rainEligible) {
   if (!predChunk || predChunk.empty) return null;
   const aligned = alignCity(truth, { times: predChunk.times, pred: predChunk.pred }, [model]);
@@ -191,22 +205,22 @@ function scoreModelMonth(model, truth, predChunk, rainEligible) {
     if (day > model.maxLeadDays) continue;
     const rows = aligned.pairs[model.id]?.[day];
     if (!rows || rows.length < MIN_LEAD_HOURS) continue;
-    const s = scoreHourRows(rows, rainEligible);
+    const s = scoreHourRows(rows, { rainEligible });
     perLead[day] = s;
     leads[day] = {
-      t: { score: s.temperature.score, rmse: s.temperature.rmse, bias: s.temperature.bias, n: s.temperature.count },
-      w: { score: s.wind.score, rmse: s.wind.rmse, bias: s.wind.bias, n: s.wind.count },
-      r: { f1: s.rain.score, n: s.rain.count },
+      t: { score: s.temperature[SCORE_FIELD], rmse: s.temperature.rmse, bias: s.temperature.bias, n: s.temperature.count },
+      w: { score: s.wind[SCORE_FIELD], rmse: s.wind.rmse, bias: s.wind.bias, n: s.wind.count },
+      r: { f1: s.rain[SCORE_FIELD], n: s.rain.count },
     };
   }
   const days = Object.keys(perLead).map(Number);
   if (days.length === 0) return null;
 
-  const skill = leadWeightedMean(days.map((d) => [d, combinedLeadScore(perLead[d])]));
+  const skill = leadWeightedMean(days.map((d) => [d, combinedLeadScore(perLead[d], SCORE_FIELD)]));
   const metricSkill = {
-    temperature: leadWeightedMean(days.map((d) => [d, perLead[d].temperature.score])),
-    rain: leadWeightedMean(days.map((d) => [d, perLead[d].rain.score])),
-    wind: leadWeightedMean(days.map((d) => [d, perLead[d].wind.score])),
+    temperature: leadWeightedMean(days.map((d) => [d, perLead[d].temperature[SCORE_FIELD]])),
+    rain: leadWeightedMean(days.map((d) => [d, perLead[d].rain[SCORE_FIELD]])),
+    wind: leadWeightedMean(days.map((d) => [d, perLead[d].wind[SCORE_FIELD]])),
   };
   return { skill, metricSkill, leads };
 }

@@ -169,6 +169,11 @@ console.log(`Baking ${TARGETS.length} boards (${CITIES.length} cities + airports
 const summary = {
   generatedAt,
   truthSource: 'best_match',
+  // Which yardstick these numbers are on: v2 is Accuracy + Extremes (the
+  // anti-blur score), v1 was RMSE-derived. Consumers of this artifact should
+  // not compare a v1 series with a v2 one. `history.html` stays on v1 by
+  // design — see scripts/history-backfill.mjs.
+  scoreModel: 'v2',
   window: { pastDays: WINDOW_PAST_DAYS },
   cities: {},
   failures: [],
@@ -234,6 +239,9 @@ for (let i = 0; i < TARGETS.length; i++) {
     scoredDays,
     dateRange,
     rainScored: !rainOff,
+    // Days of the window whose stats carry the v2 counters (null when the
+    // board was scored in-browser, where the whole window is covered).
+    v2CoveredDays: presetBoard?.v2CoveredDays ?? null,
     headline: headlineFor(presetBoard?.city?.name ?? boardName, scoredDays, rows),
     standings: rows.map((row) => ({
       rank: row.rank,

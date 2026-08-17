@@ -9,6 +9,7 @@ import { LEAD_DAYS } from './config.js';
 import {
   SCORE_CONFIG,
   scoreHourRows,
+  scoreModel,
   combinedLeadScore,
   leadWeightedMean,
 } from './score.js';
@@ -40,19 +41,24 @@ const FORM_SKILL_THRESHOLD = 70;
  * Headline skill per model over only the pairs up to `cutoffDate` — i.e. the
  * standings as they stood a week ago, computed from the same window minus its
  * last 7 days. Used for the ▲▼— movement column.
+ *
+ * The event thresholds stay the ones derived from the full window: they are a
+ * description of the location's climate, not of the slice being scored, and
+ * the box freezes them into each banked day for the same reason. The rain
+ * sample gate does re-derive, since the shorter slice really does hold fewer
+ * observed wet hours.
  */
-function skillAsOf(aligned, rainEligible, cutoffDate) {
+function skillAsOf(aligned, rainEligible, thresholds, cutoffDate) {
   const byModel = {};
   for (const model of aligned.roster) {
-    const scoreByLead = [];
+    const upTo = {};
     for (const day of LEAD_DAYS) {
       const rows = aligned.pairs[model.id]?.[day];
       if (!rows) continue;
-      const upTo = rows.filter((r) => r.dateKey <= cutoffDate);
-      if (upTo.length === 0) continue;
-      scoreByLead.push([day, combinedLeadScore(scoreHourRows(upTo, rainEligible))]);
+      const slice = rows.filter((r) => r.dateKey <= cutoffDate);
+      if (slice.length > 0) upTo[day] = slice;
     }
-    byModel[model.id] = leadWeightedMean(scoreByLead);
+    byModel[model.id] = scoreModel(upTo, { rainEligible, thresholds }).skill;
   }
   return byModel;
 }
@@ -65,21 +71,39 @@ const rankOf = (entries) =>
       .map(([id], i) => [id, i + 1]),
   );
 
+/** One model's headline under the retired v1 (error-based) score model. */
+function errorSkillOf(model) {
+  return leadWeightedMean(
+    Object.entries(model.perLead).map(([day, lead]) => [
+      Number(day),
+      combinedLeadScore(lead, 'errorScore'),
+    ]),
+  );
+}
+
 /**
  * The standings table's row data, ranked by headline skill.
  * @returns {Array<{model:Object, skill:number, metricSkill:Object,
+ *   components:Object, errorSkill:number|null, errorRank:number|null,
  *   rainRecord:Object, movement:number|null, formDots:Array<'hit'|'miss'|'na'>}>}
  */
 export function buildStandings(aligned, scores) {
   const rainEligible = scores.rainEligibility.rainScoreEligible;
+  const thresholds = scores.eventThresholds ?? null;
   const dates = aligned.scoredDates;
 
   // Ranks a week ago (needs at least a few days of history left after the cut).
   let prevRank = null;
   if (dates.length >= FORM_DAYS + 3) {
     const cutoffDate = dates[dates.length - 1 - FORM_DAYS];
-    prevRank = rankOf(Object.entries(skillAsOf(aligned, rainEligible, cutoffDate)));
+    prevRank = rankOf(Object.entries(skillAsOf(aligned, rainEligible, thresholds, cutoffDate)));
   }
+
+  // Where each model would have stood under the old error-based score — the
+  // expanded row's "was #N" line, which is the whole point of the v2 change.
+  const errorRank = rankOf(
+    Object.entries(scores.models).map(([id, s]) => [id, errorSkillOf(s)]),
+  );
 
   const formDates = dates.slice(-FORM_DAYS);
   const ranked = aligned.roster
@@ -93,11 +117,15 @@ export function buildStandings(aligned, scores) {
       prevRank && prevRank[model.id] != null ? prevRank[model.id] - rank : null;
 
     // Form dots: per-day next-day (D-1) combined skill over the last 7 days.
+    // Thresholds and the rain gate come from the whole window (a single day
+    // decides neither), so a dot is judged the same way as the headline.
     const d1Rows = aligned.pairs[model.id]?.[1] ?? [];
     const formDots = formDates.map((dateKey) => {
       const rows = d1Rows.filter((r) => r.dateKey === dateKey);
       if (rows.length === 0) return 'na';
-      const daySkill = combinedLeadScore(scoreHourRows(rows, rainEligible));
+      const daySkill = combinedLeadScore(
+        scoreHourRows(rows, { rainEligible, thresholds, rainSampleOk: s.rainSampleOk }),
+      );
       if (daySkill == null) return 'na';
       return daySkill >= FORM_SKILL_THRESHOLD ? 'hit' : 'miss';
     });
@@ -107,6 +135,9 @@ export function buildStandings(aligned, scores) {
       rank,
       skill: s.skill,
       metricSkill: s.metricSkill,
+      components: s.components,
+      errorSkill: errorSkillOf(s),
+      errorRank: errorRank[model.id] ?? null,
       rainRecord: s.rainRecord,
       perLead: s.perLead,
       movement,
