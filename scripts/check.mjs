@@ -31,7 +31,8 @@ import {
   RAMP_STEPS,
 } from '../js/leadTimeGrid.js';
 import { hydratePresetScoreboard } from '../js/server-scoreboard.js';
-import { buildComparison, rainTiming, valueStrip } from '../js/compare.js';
+import { buildComparison, rainTiming, valueStrip, selectComparisonModels } from '../js/compare.js';
+import { hydrateCompare } from '../js/server-compare.js';
 
 let checks = 0;
 const ok = (label, fn) => {
@@ -419,6 +420,52 @@ const compareFixture = () => {
     pred: { temperature: truth.temperature + lead, wind: truth.wind + lead, precipitation: truth.precipitation } }));
   return { scoredDates: dates, roster: [model], truthHours, pairs: { test: { 1: rows(1), 3: rows(3) } } };
 };
+
+ok('Compare defaults follow standings, skipping providers without daily data', () => {
+  const available = ['ifs', 'aifs', 'gfs', 'icon', 'harm'].map((id) => ({ id }));
+  const standings = ['apple', 'harm', 'icon', 'foreca', 'gfs', 'aifs', 'ifs']
+    .map((id, i) => ({ model: { id }, skill: 90 - i }));
+  assert.deepEqual(selectComparisonModels(available, standings), ['harm', 'icon', 'gfs']);
+  assert.deepEqual(selectComparisonModels(available, [...standings].reverse()), ['ifs', 'aifs', 'gfs']);
+  assert.deepEqual(selectComparisonModels(available.slice(0, 2), standings), ['aifs', 'ifs']);
+  assert.deepEqual(selectComparisonModels([], standings), []);
+  assert.deepEqual(selectComparisonModels(available, [{ model: { id: 'ifs' }, skill: null }]), []);
+});
+
+ok('Compare keeps manual picks, including all-off, when rankings refresh', () => {
+  const available = ['ifs', 'icon', 'gfs'].map((id) => ({ id }));
+  const standings = available.map((model) => ({ model, skill: 80 }));
+  assert.deepEqual(selectComparisonModels(available, standings, ['gfs', 'ifs']), ['gfs', 'ifs']);
+  assert.deepEqual(selectComparisonModels(available, standings, []), []);
+  assert.deepEqual(selectComparisonModels(available, standings, ['missing', 'icon']), ['icon']);
+});
+
+ok('Commercial Compare consumes only daily readouts and matches rain against shared truth', () => {
+  const payload = { version: 1, city: 'amsterdam', date: '2026-10-03', lead: 1, timezone: 'Europe/Amsterdam', models: [
+    { modelId: 'foreca', temperature: 25, wind: 30, rain: { total: 2, segments: [{ start: 13, end: 13 }] }, hourly: ['must be ignored'] },
+    { modelId: 'accuweather', temperature: 30 },
+    { modelId: 'unknown', temperature: 30 },
+  ] };
+  const summaries = hydrateCompare(payload, 'amsterdam', '2026-10-03', 1);
+  assert.equal(summaries.length, 1);
+  assert(!JSON.stringify(summaries).includes('hourly'));
+  const a = compareFixture();
+  const view = buildComparison(a, '2026-10-03', 1, ['test', 'foreca'], summaries);
+  assert.equal(view.models.length, 2);
+  assert.equal(view.models[1].temperature, 25);
+  const rain = view.rain.models.find((row) => row.model.id === 'foreca');
+  assert.equal(rain.total, 2);
+  assert.equal(rain.timing, 1);
+  assert.equal(buildComparison(a, '2026-10-03', 1, ['test'], summaries).models.length, 1);
+  assert.throws(() => hydrateCompare(payload, 'london', '2026-10-03', 1));
+  assert.throws(() => hydrateCompare(payload, 'amsterdam', '2026-10-01', 1));
+  assert.throws(() => hydrateCompare(payload, 'amsterdam', '2026-10-03', 7));
+  payload.models[0].rain.segments = [{ start: 0, end: 24 }];
+  payload.models[0].temperature = null;
+  const missing = hydrateCompare(payload, 'amsterdam', '2026-10-03', 1);
+  assert.equal(missing[0].rain, null);
+  assert.equal(missing[0].temperature, null);
+});
 
 ok('Compare selects the requested historical day and forecast lead independently', () => {
   const a = compareFixture();

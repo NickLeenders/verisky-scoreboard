@@ -227,6 +227,7 @@ function render(city, { aligned, scores, timezone, presetBoard = null }) {
 
   // Page order per §6/§8: standings first…
   renderStandings(aligned, scores, presetBoard);
+  const standings = lastRows;
   if (pendingLab) {
     const tr = document.querySelector(`tr.standing[data-model="${CSS.escape(pendingLab)}"]`);
     pendingLab = null;
@@ -234,7 +235,7 @@ function render(city, { aligned, scores, timezone, presetBoard = null }) {
   }
   // …then charts on the next frame so the table paints immediately.
   requestAnimationFrame(() => {
-    renderComparison(aligned, presetBoard != null);
+    renderComparison(aligned, standings, city);
     renderLead(presetBoard?.scores ?? scores);
     renderCalls(aligned, scores, presetBoard != null);
   });
@@ -374,7 +375,7 @@ function buildLabPanel(labRow, modelId) {
       </div>
       ${breakdown}
       <p class="chart-caption">forecast-vs-observed charts are public models only — this
-        provider's forecast values never reach the browser, only its aggregate scores.</p>`;
+        provider supplies aggregate scores and daily Compare summaries, not hourly forecasts.</p>`;
     lab.addEventListener('click', (e) => e.stopPropagation());
     return;
   }

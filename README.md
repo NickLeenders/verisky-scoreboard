@@ -76,23 +76,34 @@ loading skeletons. The page works fine without it.
 
 ### Commercial score boundary
 
-The browser never receives commercial forecast values or credentials.
+The browser never receives full commercial forecasts or provider credentials.
 `/scoreboard/v1/<preset>.json` accepts only the compiled-in preset slugs (each
 city plus its `<city>-airport` twin) and
 returns stored aggregate scores (standings, form, rain record, and per-lead
 skill). It accepts no coordinates, model ids, provider ids, or run selectors,
 does not trigger a score refresh or provider request, and excludes AccuWeather.
-Commercial models are consequently absent from the daily Compare and
-forecast-vs-observed lab views.
+Daily Compare uses the same fixed-preset route with `?compare=YYYY-MM-DD&lead=1`.
+This separate response contains only the requested day's temperature maximum
+(°C), wind maximum (km/h), rain total (mm), and wet-hour ranges (0–23), with
+model IDs and date/lead/timezone metadata. It accepts completed days within the
+last 30 days and leads 1–7, rejects extra selectors, and reads one stored run
+per provider nearest 06:00 local on the issue day (within that day's 00:00–12:00
+window). It makes no upstream requests. The server caches summaries for 15
+minutes; the browser keeps them in memory only, outside localStorage and bakes.
+Missing/partial readings remain unavailable. AccuWeather stays excluded.
+Commercial hourly forecast-vs-observed lab charts remain unavailable.
 
 ### Daily Compare
 
 The Compare card follows VeriSky's Verify readouts: shared number lines for
 daily maximum temperature and wind, plus rain timing lanes. Select up to five
-public models, any completed day in the loaded 30-day window, and a forecast
-lead from one to seven days. Date arrows step through available days; the
-dropdown jumps directly to a date. Unit changes and background refreshes keep
-the selection; changing location resets it.
+models (including commercial providers on preset boards), any completed day in
+the loaded 30-day window, and a forecast
+lead from one to seven days. The three highest-ranked models in the displayed
+standings with daily data are selected automatically, updating with refreshed
+rankings until you make a manual pick. Date arrows step through available days;
+the dropdown jumps directly to a date. Unit changes and background refreshes
+keep manual selections; changing location resets to the new location's top three.
 
 This archive supplies previous-day lead buckets, not the app's exact run-time
 slider. It contains temperature, wind and rain, so the app's sky comparison is

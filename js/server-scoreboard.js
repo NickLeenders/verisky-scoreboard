@@ -3,7 +3,8 @@
  *
  * This endpoint exposes aggregate scores only. It accepts a fixed city slug,
  * not coordinates, models, providers, or run selectors. Commercial forecast
- * values therefore never enter the browser, localStorage, or the static bake.
+ * series therefore never enter the browser, localStorage, or the static bake.
+ * The separate daily-summary response is consumed by server-compare.js.
  *
  * ── Score model v2 ──────────────────────────────────────────────────────────
  * The payload carries both score models side by side, exactly as the app's

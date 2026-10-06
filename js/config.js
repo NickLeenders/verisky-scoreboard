@@ -5,8 +5,8 @@
  * (constants/models.ts), translated to the ids the Open-Meteo previous-runs API
  * serves, with labels/providers/colors copied so the web scoreboard and the app
  * read as one product. Commercial models never enter the browser-side fetch /
- * align pipeline: preset cities receive only their server-computed aggregate
- * scores from api.verisky.app, with no forecast values in the response.
+ * align pipeline: preset cities receive server-computed aggregate scores and
+ * minimal daily Compare summaries from api.verisky.app, without hourly series.
  *
  * We don't show all models for every city (§1a): `resolveRoster(city)` returns a
  * 5-model global spine plus that country's home models and very-near neighbours.
@@ -87,9 +87,9 @@ export const MODEL_CATALOG = /** @type {ModelConfig[]} */ ([
 const MODEL_BY_ID = new Map(MODEL_CATALOG.map((m) => [m.id, m]));
 
 /**
- * Commercial models available only in the preset-city server scoreboard.
+ * Commercial models available in preset-city scores and daily summaries.
  * AccuWeather is deliberately absent. These entries are presentation metadata;
- * their predictions and provider credentials never enter this repository's
+ * their full predictions and provider credentials never enter this repository's
  * browser-side scoring pipeline or baked raw payloads.
  */
 export const COMMERCIAL_MODEL_CATALOG = /** @type {ModelConfig[]} */ ([

@@ -1,5 +1,6 @@
 /** Verify's daily Compare readouts, adapted to the scoreboard's day-bucket archive. */
-import { LEAD_DAYS } from './config.js';
+import { LEAD_DAYS, COMMERCIAL_MODEL_CATALOG, siteSlug } from './config.js';
+import { fetchPresetCompare } from './server-compare.js';
 import { receiptRainChart } from './charts.js';
 import { asTemp, asWind, asRain, tempUnit, windUnit, rainUnit, rainDecimals } from './units.js';
 
@@ -35,7 +36,7 @@ export function rainTiming(predicted, observed) {
   return 1 - misses / union.size;
 }
 
-export function buildComparison(aligned, dateKey, leadDay, modelIds) {
+export function buildComparison(aligned, dateKey, leadDay, modelIds, commercial = []) {
   if (!aligned.scoredDates.includes(dateKey) || !LEAD_DAYS.includes(leadDay)) return null;
   // Keep missing hours in their actual clock positions, never compress a gap.
   const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
@@ -60,6 +61,14 @@ export function buildComparison(aligned, dateKey, leadDay, modelIds) {
     }
     return { model, temperature: max(pred.map((r) => r?.temperature)), wind: max(pred.map((r) => r?.wind)) };
   });
+  for (const row of commercial.filter((row) => modelIds.includes(row.model.id))) {
+    models.push({ model: row.model, temperature: row.temperature, wind: row.wind });
+    if (rain && row.rain) {
+      const predictedWet = row.rain.segments.flatMap(({ start, end }) => Array.from({ length: end - start + 1 }, (_, i) => start + i));
+      const timing = rainTiming(predictedWet, observedWet);
+      rain.models.push({ model: row.model, ...row.rain, timing, correct: timing >= 0.5 });
+    }
+  }
   rain?.models.sort((a, b) => b.timing - a.timing);
   return { dateKey, leadDay, hours, models, rain,
     observed: { temperature: max(observed.map((r) => r?.temperature)), wind: max(observed.map((r) => r?.wind)) } };
@@ -110,11 +119,26 @@ export function valueStrip(items, observed, { unit, minSpan, width = 560 }) {
 let state = { date: null, lead: 1, models: null };
 let lastRender = null;
 let observer = null;
-export function resetComparison() { state = { date: null, lead: 1, models: null }; lastRender = null; }
+let commercialRequest = 0;
+let commercialState = { key: null, status: 'idle', models: [] };
+export function resetComparison() {
+  state = { date: null, lead: 1, models: null };
+  lastRender = null;
+  commercialRequest++;
+  commercialState = { key: null, status: 'idle', models: [] };
+}
 
-export function renderComparison(aligned, hasCommercialStandings = false) {
+/** Standings arrive in displayed rank order; only models with daily data qualify. */
+export function selectComparisonModels(available, standings, selected = null) {
+  const ids = new Set(available.map((m) => m.id));
+  if (selected !== null) return selected.filter((id) => ids.has(id));
+  return standings.filter((row) => finite(row.skill) && ids.has(row.model.id))
+    .slice(0, 3).map((row) => row.model.id);
+}
+
+export function renderComparison(aligned, standings, city) {
   const container = document.querySelector('#compare-body');
-  lastRender = [aligned, hasCommercialStandings];
+  lastRender = [aligned, standings, city];
   if (!observer && typeof ResizeObserver !== 'undefined') {
     let previousWidth = container.clientWidth;
     observer = new ResizeObserver(() => {
@@ -131,9 +155,37 @@ export function renderComparison(aligned, hasCommercialStandings = false) {
     return;
   }
   if (!dates.includes(state.date)) state.date = dates.at(-1);
-  const available = aligned.roster.filter((m) => Object.keys(aligned.pairs[m.id] ?? {}).length);
-  state.models = (state.models ?? available.slice(0, 3).map((m) => m.id))
-    .filter((id) => available.some((m) => m.id === id));
+  const slug = siteSlug(city);
+  const key = slug ? `${slug}:${state.date}:${state.lead}` : null;
+  if (key !== commercialState.key) {
+    const request = ++commercialRequest;
+    commercialState = { key, status: slug ? 'loading' : 'idle', models: [] };
+    if (slug) fetchPresetCompare(city, state.date, state.lead).then((models) => {
+      if (request !== commercialRequest) return;
+      commercialState = { key, status: 'ready', models };
+      if (lastRender) renderComparison(...lastRender);
+    }).catch(() => {
+      if (request !== commercialRequest) return;
+      commercialState = { key, status: 'error', models: [] };
+      if (lastRender) renderComparison(...lastRender);
+    });
+  }
+  // Keep scored commercial models selectable when a date/lead has a run gap.
+  // This also preserves manual picks while the next summary is loading.
+  const commercial = slug ? COMMERCIAL_MODEL_CATALOG
+    .filter((model) => standings.some((row) => row.model.id === model.id)
+      || commercialState.models.some((row) => row.model.id === model.id))
+    .map((model) => commercialState.models.find((row) => row.model.id === model.id)
+      ?? { model, temperature: null, wind: null, rain: null }) : [];
+  const available = [
+    ...aligned.roster.filter((m) => Object.values(aligned.pairs[m.id] ?? {}).some((rows) => rows.length)),
+    ...commercial.map((row) => row.model),
+  ];
+  const readings = buildComparison(aligned, state.date, state.lead, available.map((m) => m.id), commercial);
+  const withDailyData = available.filter((model) => readings.models.some((row) => row.model.id === model.id
+    && (row.temperature != null || row.wind != null)) || readings.rain?.models.some((row) => row.model.id === model.id));
+  // Keep null until the user makes a pick, so fresh rankings update automatic picks.
+  const selectedModels = selectComparisonModels(state.models === null ? withDailyData : available, standings, state.models);
   const index = dates.indexOf(state.date);
   container.innerHTML = `<div class="compare-controls">
     <div class="compare-dates">
@@ -143,16 +195,20 @@ export function renderComparison(aligned, hasCommercialStandings = false) {
     </div>
     <label>Forecast <select class="compare-lead">${LEAD_DAYS.map((lead) => `<option value="${lead}" ${state.lead === lead ? 'selected' : ''}>${lead} day${lead === 1 ? '' : 's'} ahead</option>`).join('')}</select></label>
   </div>
-  <p class="compare-hint">Pick up to five models to compare.</p>
+  <p class="compare-hint">The top three ranked models with daily data are selected automatically. Pick up to five models to compare.</p>
   <div class="compare-models" role="group" aria-label="Models to compare">${available.map((m) => {
-    const selected = state.models.includes(m.id);
-    return `<button type="button" data-model="${esc(m.id)}" aria-pressed="${selected}" ${!selected && state.models.length >= MAX_MODELS ? 'disabled' : ''}><span class="mdot" style="background:${esc(m.color)}"></span>${esc(m.label)}</button>`;
+    const selected = selectedModels.includes(m.id);
+    return `<button type="button" data-model="${esc(m.id)}" aria-pressed="${selected}" ${!selected && selectedModels.length >= MAX_MODELS ? 'disabled' : ''}><span class="mdot" style="background:${esc(m.color)}"></span>${esc(m.label)}</button>`;
   }).join('')}</div>
   <div class="compare-readouts" aria-live="polite"></div>
-  <p class="chart-caption">Previous-runs archive · green = observed analysis · local hours. ${hasCommercialStandings ? 'Commercial providers appear in aggregate scores only. ' : ''}Available days: ${esc(dates[0])} to ${esc(dates.at(-1))}.</p>`;
-  const comparison = buildComparison(aligned, state.date, state.lead, state.models);
+  <p class="chart-caption">Public models: previous-runs archive. ${slug ? 'Commercial models: daily summaries from the archived run nearest 06:00 local on the issue day. ' : ''}Green = observed analysis · local hours. Available days: ${esc(dates[0])} to ${esc(dates.at(-1))}.</p>
+  ${commercialState.status === 'loading' ? '<p class="compare-hint" role="status">Loading commercial models…</p>' : ''}
+  ${commercialState.status === 'error' ? '<p class="compare-hint" role="status">Commercial comparison unavailable. <button type="button" class="compare-retry">Retry</button></p>' : ''}
+  ${slug && commercialState.status === 'ready' && !commercialState.models.length ? '<p class="compare-hint">No commercial archive data for this day and lead.</p>' : ''}`;
+  const comparison = { ...readings, models: readings.models.filter((row) => selectedModels.includes(row.model.id)),
+    rain: readings.rain ? { ...readings.rain, models: readings.rain.models.filter((row) => selectedModels.includes(row.model.id)) } : null };
   const readouts = container.querySelector('.compare-readouts');
-  if (!state.models.length) readouts.innerHTML = '<p class="empty">Pick a model above to compare its forecast.</p>';
+  if (!selectedModels.length) readouts.innerHTML = '<p class="empty">Pick a model above to compare its forecast.</p>';
   else {
     readouts.innerHTML = ['temperature', 'wind'].map((metric) => {
       const conv = metric === 'temperature' ? asTemp : asWind;
@@ -166,18 +222,22 @@ export function renderComparison(aligned, hasCommercialStandings = false) {
     if (missing.length) readouts.innerHTML += `<p class="compare-hint">Some readings unavailable at this date and lead: ${missing.map((r) => esc(r.model.label)).join(', ')}.</p>`;
   }
   const redraw = (focusSelector) => {
-    renderComparison(aligned, hasCommercialStandings);
+    renderComparison(aligned, standings, city);
     container.querySelector(focusSelector)?.focus();
   };
   container.querySelector('.compare-date').addEventListener('change', (e) => { state.date = e.target.value; redraw('.compare-date'); });
   container.querySelector('.compare-lead').addEventListener('change', (e) => { state.lead = Number(e.target.value); redraw('.compare-lead'); });
+  container.querySelector('.compare-retry')?.addEventListener('click', () => {
+    commercialState.key = null;
+    redraw('.compare-date');
+  });
   for (const button of container.querySelectorAll('[data-step]')) button.addEventListener('click', () => {
     state.date = dates[index + Number(button.dataset.step)];
     redraw('.compare-date');
   });
   for (const button of container.querySelectorAll('[data-model]')) button.addEventListener('click', () => {
     const id = button.dataset.model;
-    state.models = state.models.includes(id) ? state.models.filter((m) => m !== id) : [...state.models, id].slice(0, MAX_MODELS);
+    state.models = selectedModels.includes(id) ? selectedModels.filter((m) => m !== id) : [...selectedModels, id].slice(0, MAX_MODELS);
     redraw(`[data-model="${id}"]`);
   });
 }
