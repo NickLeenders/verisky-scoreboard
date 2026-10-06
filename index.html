@@ -340,7 +340,7 @@
             a week ago (the window minus its last 7 days).</p>
           <p><b>Airport boards (the ✈ toggle)</b> re-score every model at the city's main
             airport, whose METAR weather station reports real instrument readings around the
-            clock. On those boards the server verifies <b>temperature and wind against the
+            clock. Unless the station banner says otherwise, the server verifies <b>temperature and wind against the
             station's own METAR observations</b> instead of the model analysis — actual
             thermometer-and-anemometer truth — while rain keeps the analysis (METAR
             precipitation groups are too sparse to score against). The in-browser charts
@@ -349,7 +349,8 @@
             Mexico City and Sydney's city boards already sit on their airport's grid cell,
             so for them the two views read the same measurement point. Airport standings
             started accruing later than the city boards at some airports, so a shorter
-            "last N days" window there is expected until the archive fills.</p>
+            "last N days" window there is expected until the archive fills. Unavailable city
+            or airport views are greyed out in the toggle.</p>
           <p>Public-model forecasts come from Open-Meteo's
             <a href="https://open-meteo.com/en/docs/previous-runs-api">previous runs archive</a>
             (what each model actually said 1 to 7 days earlier). The reference series is

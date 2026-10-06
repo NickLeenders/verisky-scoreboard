@@ -12,6 +12,7 @@
 
 import { renderComparison, resetComparison } from './compare.js';
 import { CITIES, DEFAULT_CITY_ID, airportSite } from './config.js';
+import { populateCityOptions } from './city-select.js';
 import { fetchCityData } from './fetch.js';
 import { scorePayload } from './pipeline.js';
 import { readCache, writeCache } from './cache.js';
@@ -782,11 +783,14 @@ function syncSiteUi(city) {
 
   const hasAirport = Boolean(city.id && city.airport);
   const onAirport = city.site === 'airport';
-  // Custom searched cities have no tracked airport station — hide the control
-  // entirely rather than offering a dead switch.
-  toggle.hidden = !hasAirport;
+  toggle.hidden = false;
   for (const btn of toggle.querySelectorAll('button')) {
-    const active = (btn.dataset.site === 'airport') === onAirport;
+    const isAirport = btn.dataset.site === 'airport';
+    const active = isAirport === onAirport;
+    btn.disabled = isAirport ? !hasAirport : city.cityAvailable === false;
+    btn.title = btn.disabled
+      ? (isAirport ? 'No airport board available for this location' : 'No city board available for this location')
+      : '';
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', String(active));
   }
@@ -797,8 +801,9 @@ function syncSiteUi(city) {
     banner.innerHTML =
       `<span class="site-banner-icon" aria-hidden="true">✈</span>
       <span class="site-banner-text"><b>${esc(a.name)} (${esc(a.icao)})</b> — ${esc(city.name)}'s
-        airport weather station. Temperature and wind on this board are verified against the
-        station's own METAR observations; rain is verified against the model analysis.</span>` +
+        airport weather station. ${a.truthSource === 'analysis'
+          ? 'Scores at this airport are verified against the observation-fed model analysis.'
+          : "Temperature and wind on this board are verified against the station's own METAR observations; rain is verified against the model analysis."}</span>` +
       (a.sameCell
         ? `<span class="site-banner-note">${esc(city.name)}'s city board reads the same grid
           cell — the airport is the city's measurement point.</span>`
@@ -814,7 +819,7 @@ function initSiteToggle() {
   if (!toggle) return;
   for (const btn of toggle.querySelectorAll('button')) {
     btn.addEventListener('click', () => {
-      if (!currentCity?.id) return;
+      if (btn.disabled || !currentCity?.id) return;
       const base = CITIES.find((c) => c.id === currentCity.id);
       if (!base) return;
       const wantAirport = btn.dataset.site === 'airport';
@@ -826,12 +831,7 @@ function initSiteToggle() {
 
 function initTopBar() {
   const select = $('#city-select');
-  for (const c of CITIES) {
-    const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name;
-    select.appendChild(opt);
-  }
+  populateCityOptions(select, CITIES);
   select.addEventListener('change', () => {
     const preset = CITIES.find((c) => c.id === select.value);
     if (!preset) return;

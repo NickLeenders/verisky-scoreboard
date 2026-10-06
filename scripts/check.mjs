@@ -9,7 +9,8 @@
 
 import assert from 'node:assert/strict';
 
-import { LEAD_DAYS } from '../js/config.js';
+import { LEAD_DAYS, CITIES, availableSites, siteSlug } from '../js/config.js';
+import { HISTORY_CITY_IDS } from '../js/history-config.js';
 import {
   SCORE_CONFIG,
   scoreHourRows,
@@ -38,6 +39,23 @@ const ok = (label, fn) => {
   checks += 1;
   process.stdout.write(`  ✓ ${label}\n`);
 };
+
+ok('UK boards use tracked cells and airport-only places have no duplicate city bake', () => {
+  const uk = CITIES.filter((c) => ['cambridge', 'southampton', 'sumburgh'].includes(c.id));
+  const sites = uk.flatMap(availableSites);
+  assert.deepEqual(sites.map(siteSlug), [
+    'cambridge', 'cambridge-airport', 'southampton-airport', 'sumburgh-airport',
+  ]);
+  assert.deepEqual(sites.map((c) => [Math.round(c.lat * 10) / 10, Math.round(c.lon * 10) / 10]), [
+    [52.2, 0.1], [52.2, 0.2], [50.9, -1.4], [59.9, -1.3],
+  ]);
+  for (const c of uk.filter((c) => c.cityAvailable === false)) {
+    assert.equal(c.site, 'airport', 'bare city links must default to the available airport');
+    assert(!HISTORY_CITY_IDS.includes(c.id), 'airport-only places must not become city history boards');
+  }
+  const allSlugs = CITIES.flatMap(availableSites).map(siteSlug);
+  assert.equal(new Set(allSlugs).size, allSlugs.length);
+});
 
 // ── SEDI edge cases ─────────────────────────────────────────────────────────
 

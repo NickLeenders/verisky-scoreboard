@@ -29,10 +29,10 @@ public-model-only.
 
 ### Airport boards (the ✈ City ⇄ Airport toggle)
 
-Every preset city has an **airport twin**: the same board re-scored at the
+Most preset cities have an **airport twin**: the same board re-scored at the
 city's main airport, whose METAR weather station reports real instrument
 readings around the clock. The topbar's City ⇄ Airport toggle switches between
-them (never shown for custom searched cities), a banner above the standings
+them (unavailable views are greyed out), a banner above the standings
 names the station (e.g. *Schiphol (EHAM)*), and `?city=london&site=airport` is
 the shareable URL form. On airport boards the server verifies **temperature and
 wind against the station's own METAR observations** instead of the model
@@ -45,6 +45,13 @@ lon }`); coordinates must match the server's airport presets the same way city
 coordinates must. Chicago, Mexico City and Sydney's city boards already sit on
 their airport's grid cell (`sameCell: true`), so their two views read the same
 measurement point.
+
+The UK presets also include Cambridge (city and EGSC airport), Southampton
+(EGHI airport only), and Sumburgh (EGPB airport only). Airport-only presets open
+in Airport mode, disable City, and bake only their `-airport` payload. Custom
+searched locations disable Airport. Southampton's existing score history uses
+model analysis rather than METAR truth; its station banner identifies this.
+Airport-only locations are excluded from the city-only long-term history page.
 
 You can also run the scoring outside the browser with Node 18+:
 

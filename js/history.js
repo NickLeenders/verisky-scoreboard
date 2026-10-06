@@ -9,6 +9,7 @@
 
 import { trendChart, yearOverlayChart, yearColor } from './charts.js';
 import { HISTORY_CITIES } from './history-config.js';
+import { populateCityOptions } from './city-select.js';
 import {
   asTempDelta, asWind, tempUnit, windUnit,
   unitSystem, setUnitSystem,
@@ -396,13 +397,7 @@ let currentCity = DEFAULT_CITY;
 
 function populateCitySelect() {
   const sel = $('city-select');
-  sel.innerHTML = '';
-  for (const c of HISTORY_CITIES) {
-    const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name;
-    sel.appendChild(opt);
-  }
+  populateCityOptions(sel, HISTORY_CITIES);
   sel.value = currentCity;
   sel.addEventListener('change', () => { loadCity(sel.value); });
 }

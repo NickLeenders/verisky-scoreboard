@@ -28,7 +28,7 @@ import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { CITIES, DEFAULT_CITY_ID, WINDOW_PAST_DAYS, airportSite, siteSlug } from '../js/config.js';
+import { CITIES, DEFAULT_CITY_ID, WINDOW_PAST_DAYS, availableSites, siteSlug } from '../js/config.js';
 import { fetchCityData } from '../js/fetch.js';
 import { scorePayload } from '../js/pipeline.js';
 import { buildStandings, scoreTone } from '../js/derive.js';
@@ -156,13 +156,10 @@ async function bakeIndexHtml(featured, generatedAt) {
 const generatedAt = new Date().toISOString();
 await mkdir(DATA_DIR, { recursive: true });
 
-// Every city plus its airport-station variant (baked as data/<id>-airport.json,
+// Every available city and airport board (airports use data/<id>-airport.json,
 // same shape). The airport runs the identical pipeline at the station's
 // coordinates; its server board additionally carries METAR-verified standings.
-const TARGETS = CITIES.flatMap((city) => {
-  const airport = airportSite(city);
-  return airport ? [city, airport] : [city];
-});
+const TARGETS = CITIES.flatMap(availableSites);
 
 console.log(`Baking ${TARGETS.length} boards (${CITIES.length} cities + airports, window ${WINDOW_PAST_DAYS}d)${FROM_CACHE ? ' — from cache' : ''}…`);
 

@@ -13,8 +13,8 @@
 
 import { resolveRoster, CITIES } from './config.js';
 
-/** Cities we bake long-term history for: every default scoreboard city. */
-export const HISTORY_CITY_IDS = CITIES.map((c) => c.id);
+/** City boards only; airport-only presets do not enter long-term history. */
+export const HISTORY_CITY_IDS = CITIES.filter((c) => c.cityAvailable !== false).map((c) => c.id);
 
 /** The city objects we bake, in order. */
 export const HISTORY_CITIES = HISTORY_CITY_IDS

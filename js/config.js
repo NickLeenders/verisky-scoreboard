@@ -218,6 +218,16 @@ export const CITIES = [
     airport: { icao: 'EHAM', name: 'Schiphol', lat: 52.315, lon: 4.79 } },
   { id: 'london', name: 'London', lat: 51.51, lon: -0.13, country: 'GB',
     airport: { icao: 'EGLL', name: 'Heathrow', lat: 51.477, lon: -0.461 } },
+  { id: 'cambridge', name: 'Cambridge', lat: 52.2, lon: 0.11667, country: 'GB',
+    airport: { icao: 'EGSC', name: 'Cambridge Airport', lat: 52.205, lon: 0.175 } },
+  // Only the airport cells are tracked; do not manufacture a city board.
+  { id: 'southampton', name: 'Southampton', lat: 50.944, lon: -1.358, country: 'GB',
+    site: 'airport', cityAvailable: false,
+    airport: { icao: 'EGHI', name: 'Southampton Airport', lat: 50.944, lon: -1.358,
+      truthSource: 'analysis' } },
+  { id: 'sumburgh', name: 'Sumburgh', lat: 59.88, lon: -1.296, country: 'GB',
+    site: 'airport', cityAvailable: false,
+    airport: { icao: 'EGPB', name: 'Sumburgh Airport', lat: 59.88, lon: -1.296 } },
   { id: 'berlin', name: 'Berlin', lat: 52.52, lon: 13.41, country: 'DE',
     airport: { icao: 'EDDB', name: 'Brandenburg', lat: 52.38068, lon: 13.53064 } },
   { id: 'paris', name: 'Paris', lat: 48.86, lon: 2.35, country: 'FR',
@@ -256,6 +266,12 @@ export const DEFAULT_CITY_ID = 'amsterdam';
 export function airportSite(city) {
   if (!city || !city.id || !city.airport) return null;
   return { ...city, site: 'airport', lat: city.airport.lat, lon: city.airport.lon };
+}
+
+/** Only genuinely available boards, used by the bake and other enumerators. */
+export function availableSites(city) {
+  const airport = airportSite(city);
+  return [city.cityAvailable === false ? null : city, airport].filter(Boolean);
 }
 
 /** The server-scoreboard slug / baked-file basename for a loaded location. */
