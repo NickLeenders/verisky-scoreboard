@@ -49,8 +49,9 @@ measurement point.
 The UK presets also include Cambridge (city and EGSC airport), Southampton
 (EGHI airport only), and Sumburgh (EGPB airport only). Airport-only presets open
 in Airport mode, disable City, and bake only their `-airport` payload. Custom
-searched locations disable Airport. Southampton's existing score history uses
-model analysis rather than METAR truth; its station banner identifies this.
+searched locations disable Airport. Lisbon (LPPT), Seattle (KSEA), and Phoenix
+(KPHX) are also airport-only presets. Southampton, Seattle, and Phoenix use
+model analysis rather than METAR truth; their station banners identify this.
 Airport-only locations are excluded from the city-only long-term history page.
 
 You can also run the scoring outside the browser with Node 18+:
@@ -157,6 +158,12 @@ automatically; HRRR is excluded structurally (it duplicates GFS at short lead).
 - `?name=Utrecht&lat=52.09&lon=5.12` loads any location by coordinates
 - `&lab=ecmwf_ifs025` opens a specific model's detail row on load
 
+Both pages automatically use Fahrenheit, mph and inches for US locations, and
+Celsius, km/h and mm elsewhere, including when opening a location link directly.
+The unit toggle overrides this for the current location; selecting another
+location restores its country default. Switching between a city's city and
+airport boards keeps the manual choice. Custom location links carry their
+`country` code from search; links without one default to metric.
 
 
 ## Notes on the scoring

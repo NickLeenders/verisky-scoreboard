@@ -9,7 +9,7 @@
 
 import assert from 'node:assert/strict';
 
-import { LEAD_DAYS, CITIES, availableSites, siteSlug } from '../js/config.js';
+import { LEAD_DAYS, CITIES, availableSites, siteSlug, airportSite } from '../js/config.js';
 import { HISTORY_CITY_IDS } from '../js/history-config.js';
 import {
   SCORE_CONFIG,
@@ -33,6 +33,10 @@ import {
 import { hydratePresetScoreboard } from '../js/server-scoreboard.js';
 import { buildComparison, rainTiming, valueStrip, selectComparisonModels } from '../js/compare.js';
 import { hydrateCompare } from '../js/server-compare.js';
+import {
+  useLocationUnits, setUnitSystem, unitSystem, asTemp, asTempDelta,
+  tempUnit, windUnit, rainUnit,
+} from '../js/units.js';
 
 let checks = 0;
 const ok = (label, fn) => {
@@ -40,6 +44,34 @@ const ok = (label, fn) => {
   checks += 1;
   process.stdout.write(`  ✓ ${label}\n`);
 };
+
+ok('a first US location opens in Fahrenheit with matching US unit labels', () => {
+  useLocationUnits(CITIES.find((city) => city.id === 'newyork'));
+  assert.equal(unitSystem(), 'imperial');
+  assert.equal(asTemp(0), 32);
+  assert.equal(asTempDelta(10), 18);
+  assert.deepEqual([tempUnit(), windUnit(), rainUnit()], ['°F', 'mph', 'in']);
+});
+
+ok('manual units survive retries and airport switches, but new locations use country defaults', () => {
+  const ny = CITIES.find((city) => city.id === 'newyork');
+  setUnitSystem('metric');
+  useLocationUnits(ny);
+  useLocationUnits(airportSite(ny));
+  assert.equal(unitSystem(), 'metric');
+  useLocationUnits(CITIES.find((city) => city.id === 'chicago'));
+  assert.equal(unitSystem(), 'imperial');
+  useLocationUnits(CITIES.find((city) => city.id === 'toronto'));
+  assert.equal(unitSystem(), 'metric');
+  assert.equal(asTemp(0), 0);
+});
+
+ok('searched/shared US locations use Fahrenheit; missing country defaults to metric', () => {
+  useLocationUnits({ id: null, lat: 21.3, lon: -157.8, country: 'us' });
+  assert.equal(unitSystem(), 'imperial');
+  useLocationUnits({ id: null, lat: 52.09, lon: 5.12 });
+  assert.equal(unitSystem(), 'metric');
+});
 
 ok('UK boards use tracked cells and airport-only places have no duplicate city bake', () => {
   const uk = CITIES.filter((c) => ['cambridge', 'southampton', 'sumburgh'].includes(c.id));
@@ -56,6 +88,25 @@ ok('UK boards use tracked cells and airport-only places have no duplicate city b
   }
   const allSlugs = CITIES.flatMap(availableSites).map(siteSlug);
   assert.equal(new Set(allSlugs).size, allSlugs.length);
+});
+
+ok('Lisbon, Seattle and Phoenix use only their tracked airport cells', () => {
+  const expected = [
+    ['lisbon', 'PT', 'LPPT', 38.8, -9.1],
+    ['seattle', 'US', 'KSEA', 47.4, -122.3],
+    ['phoenix', 'US', 'KPHX', 33.4, -112.0],
+  ];
+  for (const [id, country, icao, lat, lon] of expected) {
+    const city = CITIES.find((c) => c.id === id);
+    assert(city);
+    assert.equal(city.country, country);
+    assert.equal(city.airport.icao, icao);
+    assert.equal(city.cityAvailable, false);
+    assert.equal(city.site, 'airport');
+    assert.deepEqual(availableSites(city).map(siteSlug), [`${id}-airport`]);
+    assert.deepEqual([Math.round(city.lat * 10) / 10, Math.round(city.lon * 10) / 10], [lat, lon]);
+    assert(!HISTORY_CITY_IDS.includes(id));
+  }
 });
 
 // ── SEDI edge cases ─────────────────────────────────────────────────────────

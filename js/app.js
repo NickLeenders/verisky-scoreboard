@@ -47,6 +47,7 @@ import { breakdownHtml, hasBreakdown } from './breakdown.js';
 import {
   unitSystem,
   setUnitSystem,
+  useLocationUnits,
   asTemp,
   asTempDelta,
   asWind,
@@ -113,6 +114,8 @@ let pendingLab = new URLSearchParams(location.search).get('lab');
 
 async function loadCity(city) {
   const token = ++loadToken;
+  useLocationUnits(city);
+  syncUnitToggle();
   currentCity = city;
   resetComparison();
   history.replaceState(null, '', urlForCity(city));
@@ -907,23 +910,24 @@ function initTopBar() {
 
 // ── Units toggle (metric ⇄ imperial) ─────────────────────────────────────────
 
+function syncUnitToggle() {
+  for (const b of document.querySelectorAll('#unit-toggle button')) {
+    const active = b.dataset.units === unitSystem();
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', String(active));
+  }
+}
+
 function initUnitToggle() {
   const group = $('#unit-toggle');
   if (!group) return;
   const buttons = [...group.querySelectorAll('button')];
-  const sync = () => {
-    for (const b of buttons) {
-      const active = b.dataset.units === unitSystem();
-      b.classList.toggle('active', active);
-      b.setAttribute('aria-pressed', String(active));
-    }
-  };
-  sync();
+  syncUnitToggle();
   for (const btn of buttons) {
     btn.addEventListener('click', () => {
       if (btn.dataset.units === unitSystem()) return;
       setUnitSystem(btn.dataset.units);
-      sync();
+      syncUnitToggle();
       rerender();
     });
   }

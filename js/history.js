@@ -12,7 +12,7 @@ import { HISTORY_CITIES } from './history-config.js';
 import { populateCityOptions } from './city-select.js';
 import {
   asTempDelta, asWind, tempUnit, windUnit,
-  unitSystem, setUnitSystem,
+  unitSystem, setUnitSystem, useLocationUnits,
 } from './units.js';
 
 const DEFAULT_CITY = 'newyork';
@@ -356,23 +356,24 @@ function wireModelSelect() {
 }
 
 // ── Units ──────────────────────────────────────────────────────────────────────
+function syncUnitToggle() {
+  for (const b of $('unit-toggle').querySelectorAll('button')) {
+    const on = b.dataset.units === unitSystem();
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  }
+}
+
 function wireUnitToggle() {
   const toggle = $('unit-toggle');
-  const sync = () => {
-    for (const b of toggle.querySelectorAll('button')) {
-      const on = b.dataset.units === unitSystem();
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', String(on));
-    }
-  };
   toggle.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
     setUnitSystem(b.dataset.units);
-    sync();
+    syncUnitToggle();
     if (DATA) render(); // only temp/wind RMSE display changes; scores are unit-independent
   });
-  sync();
+  syncUnitToggle();
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
@@ -415,6 +416,8 @@ function syncUrl() {
 }
 
 async function loadCity(cityId) {
+  useLocationUnits(HISTORY_CITIES.find((city) => city.id === cityId) ?? { id: cityId });
+  syncUnitToggle();
   currentCity = cityId;
   $('city-select').value = cityId;
   syncUrl();

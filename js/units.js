@@ -3,18 +3,23 @@
  *
  * Scoring stays in metric — the 0–100 scores are unit-independent — so only the
  * physical quantities shown on the page (temperatures, wind speeds, rain
- * amounts) pass through here at render time. The choice lives in localStorage
- * and defaults to metric. Safe to import in Node (the bake): touching
- * localStorage there throws and is swallowed, leaving the metric default.
+ * amounts) pass through here at render time. Each location defaults to US
+ * units for country US, metric elsewhere. A manual choice lasts until the
+ * location changes. Safe to import in Node (the bake), defaulting to metric.
  */
 
-const KEY = 'verisky:units';
-
 let system = 'metric';
-try {
-  const saved = localStorage.getItem(KEY);
-  if (saved === 'imperial' || saved === 'metric') system = saved;
-} catch { /* no storage (private mode / Node) — keep the default */ }
+let locationKey = null;
+
+/** Apply before rendering, including the initial URL location. */
+export function useLocationUnits(city) {
+  const country = city.country?.toUpperCase();
+  // City/airport switches and retries keep a manual choice for the same place.
+  const key = `${country ?? ''}:${city.id ?? `${city.lat},${city.lon}`}`;
+  if (key === locationKey) return;
+  locationKey = key;
+  setUnitSystem(country === 'US' ? 'imperial' : 'metric');
+}
 
 export function unitSystem() {
   return system;
@@ -26,7 +31,6 @@ export function isImperial() {
 
 export function setUnitSystem(next) {
   system = next === 'imperial' ? 'imperial' : 'metric';
-  try { localStorage.setItem(KEY, system); } catch { /* ignore */ }
 }
 
 // ── Value conversion (nulls pass through untouched) ──────────────────────────
