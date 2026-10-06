@@ -53,18 +53,20 @@ export function hasBreakdown(row) {
 }
 
 /** A 0–100 component as a track. Absent for null; empty for a measured zero. */
-function bar(value) {
-  if (value == null) return '';
-  return `<span class="bd-track"><span class="bd-track-fill tone-bg-${scoreTone(value)}"
+function bar(value, kind = 'score') {
+  if (value == null || !Number.isFinite(value)) return '';
+  const tone = kind === 'score' ? `tone-bg-${scoreTone(value)}` : `bd-fill-${kind}`;
+  return `<span class="bd-track${kind === 'false-alarm' ? ' bd-track-fa' : ''}" aria-hidden="true"><span class="bd-track-fill ${tone}"
     style="width:${Math.max(0, Math.min(100, value))}%"></span></span>`;
 }
 
-function cell(label, value, track, sub) {
+function cell(label, value, track, sub, after = '') {
   return `<div class="bd-cell">
       <span class="bd-label">${esc(label)}</span>
       <span class="num bd-value">${value}</span>
       ${track}
       <span class="bd-sub">${sub}</span>
+      ${after}
     </div>`;
 }
 
@@ -72,14 +74,15 @@ function cell(label, value, track, sub) {
 function metricBlock(name, comp, score, { unit, conv, tolerance, relative }) {
   if (!comp || score == null) return '';
 
-  const called = comp.eventHits == null || comp.falseAlarms == null
-    ? null
-    : comp.eventHits + comp.falseAlarms;
+  const hasEvents = comp.extremes != null && comp.eventHits != null
+    && comp.falseAlarms != null && comp.eventHours > 0;
+  const called = hasEvents ? comp.eventHits + comp.falseAlarms : 0;
+  const caught = hasEvents ? (comp.eventHits / comp.eventHours) * 100 : null;
+  const falseAlarm = called > 0 ? (comp.falseAlarms / called) * 100 : null;
   const extremesSub = comp.extremes == null
     ? `too few extreme hours to judge (${comp.eventHours} in the window)`
-    : `caught ${pct(comp.eventHits, comp.eventHours) ?? '—'} · ${
-      called === 0 ? 'never called one' : `${pct(comp.falseAlarms, called) ?? '—'} false alarms`
-    } · ${comp.eventHours} event hrs`;
+    : !hasEvents ? `${comp.eventHours} event hrs`
+      : called === 0 ? 'never called one' : `${pct(comp.falseAlarms, called)} false alarms`;
 
   const sharp = comp.sharpness;
   const sharpSub = sharp == null
@@ -103,7 +106,14 @@ function metricBlock(name, comp, score, { unit, conv, tolerance, relative }) {
     `within ${fmt(conv(tolerance), 1)}&nbsp;${esc(unit)}${relative ? ' or 20%' : ''} · ${
       comp.count.toLocaleString('en')} hours`,
   )}
-    ${cell('Extremes', comp.extremes == null ? '—' : fmt(comp.extremes), bar(comp.extremes), extremesSub)}
+    ${cell(
+    'Extremes',
+    hasEvents ? `caught ${pct(comp.eventHits, comp.eventHours)}` : fmt(comp.extremes),
+    bar(caught, 'caught'),
+    extremesSub,
+    `${bar(falseAlarm, 'false-alarm')}${hasEvents
+      ? `<span class="bd-fine">SEDI ${fmt(comp.extremes)} · ${comp.eventHours} event hrs</span>` : ''}`,
+  )}
     ${cell(
     'Sharpness',
     `<span class="tone-${sharpTone}">${sharp == null ? '—' : `${sharp.toFixed(2)}×`}</span>`,
@@ -127,9 +137,10 @@ function rainBlock(comp, score) {
     ${cell(
     'Wet hours',
     pct(comp.eventHits, comp.eventHours) ?? '—',
-    bar(comp.eventHours > 0 ? (comp.eventHits / comp.eventHours) * 100 : null),
+    bar(comp.eventHours > 0 ? (comp.eventHits / comp.eventHours) * 100 : null, 'caught'),
     `caught ${comp.eventHits} of ${comp.eventHours} observed wet hours · ${
       called === 0 ? 'never called rain' : `${pct(comp.falseAlarms, called)} of its rain calls stayed dry`}`,
+    bar(comp.eventHours > 0 && called > 0 ? (comp.falseAlarms / called) * 100 : null, 'false-alarm'),
   )}
   </div>`;
 }

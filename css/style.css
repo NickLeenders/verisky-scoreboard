@@ -430,7 +430,11 @@ th.c-metric, th.c-record { text-align: right; }
   overflow: hidden;
 }
 .bd-track-fill { display: block; height: 100%; border-radius: 2px; }
+.bd-fill-caught { background: var(--text-2); }
+.bd-fill-false-alarm { background: var(--tone-bad); opacity: 0.7; }
+.bd-track-fa { margin-top: 0.2rem; }
 .bd-sub { display: block; color: var(--text-3); font-size: 0.73rem; line-height: 1.35; }
+.bd-fine { display: block; color: var(--text-3); font-size: 0.66rem; line-height: 1.35; margin-top: 0.3rem; }
 .bd-note { color: var(--text-3); font-size: 0.76rem; margin: 0.55rem 0 0; }
 
 /* ── Receipt ─────────────────────────────────────────────────────────────── */

@@ -201,6 +201,23 @@ ok('the breakdown states percentages, the old rank, and the folded-back gate', (
   assert(!html.includes('undefined') && !html.includes('NaN'));
 });
 
+ok('extremes lead with recall and give false alarms a separate meter', () => {
+  const html = breakdownHtml(sampleRow);
+  assert(html.includes('bd-value">caught 61%</span>'));
+  assert(html.includes('bd-fine">SEDI 92 · 192 event hrs'));
+  assert.equal((html.match(/bd-fill-caught/g) ?? []).length, 2, 'temperature and rain; calm wind has no meter');
+  assert.equal((html.match(/bd-fill-false-alarm/g) ?? []).length, 2);
+  assert(!html.includes('width:91.6%'), 'SEDI must never be drawn as a percentage bar');
+
+  const legacy = structuredClone(sampleRow);
+  delete legacy.components.temperature.eventHits;
+  delete legacy.components.temperature.falseAlarms;
+  const legacyHtml = breakdownHtml(legacy);
+  assert(legacyHtml.includes('bd-value">92</span>'), 'older payloads retain the index');
+  assert.equal((legacyHtml.match(/bd-fill-caught/g) ?? []).length, 1, 'only rain has measured recall');
+  assert(!legacyHtml.includes('NaN'));
+});
+
 ok('null draws no track, zero draws an empty one', () => {
   const zero = structuredClone(sampleRow);
   zero.components.temperature.accuracy = 0;
@@ -218,6 +235,9 @@ ok('"never called one" is a state, and an unscored metric hides its split', () =
     ...quiet.components.temperature, eventHits: 0, falseAlarms: 0, extremes: 50,
   };
   assert(breakdownHtml(quiet).includes('never called one'));
+  const quietHtml = breakdownHtml(quiet);
+  assert(quietHtml.includes('bd-value">caught 0%</span>'));
+  assert.equal((quietHtml.match(/bd-fill-false-alarm/g) ?? []).length, 1, 'no false-alarm ratio without calls; rain still has one');
 
   const dry = structuredClone(sampleRow);
   dry.metricSkill.rain = null;
