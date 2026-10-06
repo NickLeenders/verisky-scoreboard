@@ -114,6 +114,37 @@ Daily highs need at least 20 valid hours; rain totals and timing require a full
 24-hour local-clock series. Missing readings are labelled rather than treated
 as dry weather. Rain timing uses the app's 0.2 mm threshold and ±1 hour match.
 
+## Score map (`map.html`)
+
+The **Score map** link opens an edge-to-edge world map, also linked from Model
+trends. It carries the selected board location across, with shareable map centre,
+zoom, metric and window in the URL. Choose Overall, Temperature, Rain, Wind or
+Sun and a 7/14/30/60/90-day lookback (30 days by default). The app's feathered
+winner overlay, model colours, OpenFreeMap basemap and airport markers are
+ported from `VeriSky/src/components/map/modelMapHtml.ts`.
+
+Tap a grid location for the top two models from the same stored winner planes
+that paint the map; these scores are quantized in 0.4-point steps. Tap an airport
+for its top four models. Grey areas are within one point of a tie. The legend
+shows area-weighted shares of the visible map; Blend remains a separate footnote.
+Airport popups link to their existing preset board when available; grid popups
+link to a custom-location board (whose client-scored roster/window can differ).
+
+The page fetches **aggregate data only**, without an app token, from three exact
+public routes on `api.verisky.app`: `/scoreboard/map/grid?window=&metric=`,
+`/scoreboard/map/stations?window=`, and
+`/scoreboard/map/point?window=&metric=&lat=&lon=`. These routes are handled by
+`/srv/openmeteo/dashboard/src/public-map.js`, with the Caddy exact-path allowlist
+in `/srv/openmeteo/caddy/Caddyfile`. Point lookups read five bytes from the
+existing map raster; they never call the scorer or a forecast provider. The
+routes validate their selectors, exclude AccuWeather, and are rate limited.
+Nothing needs baking into this repository for the map to stay current.
+
+Map libraries are vendored under `vendor/map` so the page needs no library CDN
+at runtime. The basemap still fetches OpenFreeMap tiles. Run
+`node scripts/check-map.mjs` for the binary-contract, geographic-boundary and
+navigation checks (also run in CI).
+
 ## Long-term trends (`history.html`)
 
 `history.html` charts how each model's error has moved over its **full**

@@ -119,6 +119,7 @@ async function loadCity(city) {
   currentCity = city;
   resetComparison();
   history.replaceState(null, '', urlForCity(city));
+  $('#score-map-link').href = `map.html${urlForCity(city)}`;
   syncSelector(city);
   setStatus('loading');
 

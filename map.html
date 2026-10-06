@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Score map · VeriSky Scoreboard</title>
+  <meta name="description" content="Explore which weather model performs best around the world, with VeriSky's score map and station observations." />
+  <meta name="theme-color" content="#05080f" />
+  <link rel="stylesheet" href="vendor/map/leaflet.css" />
+  <link rel="stylesheet" href="vendor/map/maplibre-gl.css" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/map.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%234c8dff'/%3E%3C/svg%3E" />
+</head>
+<body class="map-page">
+  <header class="topbar map-topbar">
+    <a class="brand" href="./">VeriSky <span class="brand-sub">scoreboard</span></a>
+    <nav class="page-nav" aria-label="Scoreboard views">
+      <a class="nav-link" id="board-link" href="./">Standings</a>
+      <a class="nav-link" href="map.html" aria-current="page">Score map</a>
+      <a class="nav-link" href="history.html">Model trends</a>
+    </nav>
+    <label class="map-jump">Jump to <select id="map-city" aria-label="Jump to a city"><option value="">Explore the world</option></select></label>
+  </header>
+  <main class="map-screen" aria-label="World map of weather model scores">
+    <div id="map" aria-label="Interactive score map. Use arrow keys to pan, plus or minus to zoom, and Enter for scores at the centre."></div>
+    <section class="map-toolbar" id="map-toolbar" aria-label="Map filters">
+      <div class="map-heading"><div><h1>Which model gets it right?</h1><p>Explore the highest-scoring forecasts, place by place.</p></div>
+        <label class="map-window">Past <select id="map-window" aria-label="Score window"><option value="7">7 days</option><option value="14">14 days</option><option value="30" selected>30 days</option><option value="60">60 days</option><option value="90">90 days</option></select></label>
+      </div>
+      <div class="map-metrics" id="map-metrics" role="group" aria-label="Weather metric">
+        <button type="button" data-metric="combined" aria-pressed="true">Overall</button>
+        <button type="button" data-metric="temperature" aria-pressed="false">Temperature</button>
+        <button type="button" data-metric="rain" aria-pressed="false">Rain</button>
+        <button type="button" data-metric="wind" aria-pressed="false">Wind</button>
+        <button type="button" data-metric="sun" aria-pressed="false">Sun</button>
+      </div>
+      <div class="map-toolbar-foot"><span id="map-status" role="status" aria-live="polite">Loading scores…</span><label><input id="map-airports" type="checkbox" checked /> Stations</label></div>
+      <div id="map-error" class="map-error" hidden><span id="map-error-text"></span> <button id="map-retry" type="button">Try again</button></div>
+    </section>
+    <aside id="map-legend" class="map-legend" aria-label="Model colours and share of the visible map" hidden></aside>
+    <details class="map-help"><summary>How to read the map</summary><div>
+      <p><b>Colour shows the leading model.</b> Grey means the top two are less than one point apart. Tap anywhere for scores out of 100; tap a dot for an airport or weather station.</p>
+      <p>The world grid uses observation-fed model analysis. Station temperature and wind use observations where available (usually METAR at airports); rain and sun use analysis. Different reference data can produce different winners.</p>
+      <p>Grid popups show the best two models, rounded from the map's stored scores. Station popups show the top four. Blend is shown separately because it combines the models being ranked.</p>
+      <p>Scores combine forecast lead times. Models with thin history are held out of the grid; straight regional edges can reflect a change in the verifying analysis. The legend measures area in the current view.</p>
+    </div></details>
+    <noscript><p class="map-noscript">Enable JavaScript to explore the score map. <a href="./">Back to standings</a>.</p></noscript>
+  </main>
+  <script src="vendor/map/leaflet.js"></script>
+  <script src="vendor/map/maplibre-gl.js"></script>
+  <script src="vendor/map/leaflet-maplibre-gl.js"></script>
+  <script type="module" src="js/map.js"></script>
+</body>
+</html>
