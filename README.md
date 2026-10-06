@@ -75,8 +75,25 @@ city plus its `<city>-airport` twin) and
 returns stored aggregate scores (standings, form, rain record, and per-lead
 skill). It accepts no coordinates, model ids, provider ids, or run selectors,
 does not trigger a score refresh or provider request, and excludes AccuWeather.
-Commercial models are consequently absent from the raw-call receipt and
+Commercial models are consequently absent from the daily Compare and
 forecast-vs-observed lab views.
+
+### Daily Compare
+
+The Compare card follows VeriSky's Verify readouts: shared number lines for
+daily maximum temperature and wind, plus rain timing lanes. Select up to five
+public models, any completed day in the loaded 30-day window, and a forecast
+lead from one to seven days. Date arrows step through available days; the
+dropdown jumps directly to a date. Unit changes and background refreshes keep
+the selection; changing location resets it.
+
+This archive supplies previous-day lead buckets, not the app's exact run-time
+slider. It contains temperature, wind and rain, so the app's sky comparison is
+not shown. Green marks are the scoreboard's observation-fed analysis, including
+on airport boards; airport METAR truth applies only to server aggregate scores.
+Daily highs need at least 20 valid hours; rain totals and timing require a full
+24-hour local-clock series. Missing readings are labelled rather than treated
+as dry weather. Rain timing uses the app's 0.2 mm threshold and ±1 hour match.
 
 ## Long-term trends (`history.html`)
 

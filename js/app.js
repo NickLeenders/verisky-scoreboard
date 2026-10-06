@@ -4,12 +4,13 @@
  * Flow: skeleton is in the HTML → cached data (if any) renders instantly →
  * a network refresh (skipped entirely while the cache is fresh, §5) re-renders
  * in place. Sections fill in page order: standings table first, then the
- * receipt + lead-time two-up, then the other-calls strip.
+ * comparison + lead-time two-up, then the other-calls strip.
  *
  * City search hits the Open-Meteo geocoding endpoint lazily — only when the
  * user types — and fetches forecast data only on selection.
  */
 
+import { renderComparison, resetComparison } from './compare.js';
 import { CITIES, DEFAULT_CITY_ID, airportSite } from './config.js';
 import { fetchCityData } from './fetch.js';
 import { scorePayload } from './pipeline.js';
@@ -19,7 +20,6 @@ import { fetchPresetScoreboard } from './server-scoreboard.js';
 import {
   scoreTone,
   buildStandings,
-  buildReceipt,
   buildLeadSeries,
   buildGhost,
   buildMedianComparison,
@@ -31,8 +31,6 @@ import {
   leadTimeChart,
   leadDayAtClientX,
   LEAD_FOCUS_LIMIT,
-  receiptRainChart,
-  receiptLineChart,
   ghostChart,
   medianChart,
 } from './charts.js';
@@ -68,7 +66,6 @@ const fmt = (v, d = 0) => (v == null ? '—' : v.toFixed(d));
 const fmtSigned = (v, d = 1) => (v == null ? '—' : `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(d)}`);
 // Rain amounts (mm/in) — converts to the active unit with unit-aware precision.
 const fmtRain = (mm) => fmt(asRain(mm), rainDecimals());
-const fmtRainSigned = (mm) => fmtSigned(asRain(mm), rainDecimals());
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -116,6 +113,7 @@ let pendingLab = new URLSearchParams(location.search).get('lab');
 async function loadCity(city) {
   const token = ++loadToken;
   currentCity = city;
+  resetComparison();
   history.replaceState(null, '', urlForCity(city));
   syncSelector(city);
   setStatus('loading');
@@ -201,7 +199,7 @@ function setStatus(state, detail) {
 }
 
 function showSkeletons() {
-  for (const id of ['standings-body', 'receipt-body', 'lead-body', 'calls-body']) {
+  for (const id of ['standings-body', 'compare-body', 'lead-body', 'calls-body']) {
     const el = document.getElementById(id);
     el.innerHTML = '<div class="skeleton"></div>'.repeat(id === 'standings-body' ? 4 : 3);
   }
@@ -212,7 +210,7 @@ function renderError(error) {
     `<p class="error">Couldn't load data: ${esc(error.message)} ` +
     `<button class="retry" type="button">Retry</button></p>`;
   $('#standings-body .retry').addEventListener('click', () => loadCity(currentCity));
-  $('#receipt-body').innerHTML = '';
+  $('#compare-body').innerHTML = '';
   $('#lead-body').innerHTML = '';
   $('#calls-body').innerHTML = '';
 }
@@ -235,7 +233,7 @@ function render(city, { aligned, scores, timezone, presetBoard = null }) {
   }
   // …then charts on the next frame so the table paints immediately.
   requestAnimationFrame(() => {
-    renderReceipt(aligned, presetBoard != null);
+    renderComparison(aligned, presetBoard != null);
     renderLead(presetBoard?.scores ?? scores);
     renderCalls(aligned, scores, presetBoard != null);
   });
@@ -427,115 +425,6 @@ function buildLabPanel(labRow, modelId) {
   }
   // Clicks inside the open lab shouldn't collapse it via the row handler.
   lab.addEventListener('click', (e) => e.stopPropagation());
-}
-
-// ── Yesterday's receipt ──────────────────────────────────────────────────────
-
-const RECEIPT_TABS = [
-  ['rain', 'Rain'],
-  ['temperature', 'Temp'],
-  ['wind', 'Wind'],
-];
-
-function renderReceipt(aligned, hasCommercialStandings = false) {
-  const container = $('#receipt-body');
-  const receipt = buildReceipt(aligned);
-  if (!receipt) {
-    container.innerHTML = '<p class="empty">No data for yesterday.</p>';
-    $('#receipt-sub').textContent = '';
-    return;
-  }
-
-  const tabs = RECEIPT_TABS.filter(([key]) => receipt.views[key]);
-  container.innerHTML = `
-    <div class="receipt-head">
-      <span class="metric-tabs" role="tablist">
-        ${tabs.map(([key, label]) => `<button type="button" role="tab" data-metric="${key}"
-          class="${key === receipt.defaultMetric ? 'active' : ''}">${label}</button>`).join('')}
-      </span>
-    </div>
-    <div class="receipt-chart"></div>
-    <p class="chart-caption"></p>
-    <div class="calls-grid"></div>`;
-
-  const draw = (metric) => {
-    const view = receipt.views[metric];
-    const chartEl = container.querySelector('.receipt-chart');
-    const capEl = container.querySelector('.chart-caption');
-    const gridEl = container.querySelector('.calls-grid');
-
-    if (metric === 'rain') {
-      $('#receipt-sub').textContent =
-        `${receipt.dateKey} · D-1 rain calls vs observed · ` +
-        (view.rained
-          ? `${fmtRain(view.observedTotal)} ${rainUnit()} fell${view.onset ? ` from ${view.onset}` : ''}`
-          : 'stayed dry');
-      const rview = {
-        ...view,
-        observedTotal: asRain(view.observedTotal),
-        models: view.models.map((m) => ({ ...m, total: asRain(m.total) })),
-      };
-      chartEl.innerHTML = receiptRainChart(rview, receipt.hours, {
-        rainUnit: rainUnit(),
-        decimals: rainDecimals(),
-      });
-      capEl.innerHTML =
-        `bars = hours each model called rain · <span class="key key-obs"></span> band = when it actually rained · ` +
-        `brightest = best timing · ${rainUnit()} totals at right` +
-        (hasCommercialStandings ? ' · raw-call view intentionally excludes commercial providers' : '');
-      gridEl.innerHTML = view.models
-        .map(
-          (c, i) => `<div class="call ${c.correct ? 'call-win' : 'call-loss'}${i === 0 ? '' : ' call-dim'}">
-            <span class="mdot" style="background:${esc(c.model.color)}"></span>
-            <span class="call-label">${esc(c.model.label)}</span>
-            <span class="num">${fmtRain(c.total)} ${rainUnit()}</span>
-            <span class="num call-delta">${fmtRainSigned(c.delta)} ${rainUnit()}</span>
-            <span class="call-verdict">${c.correct ? '✓' : '✕'}</span>
-          </div>`,
-        )
-        .join('');
-    } else {
-      const isTemp = metric === 'temperature';
-      // Absolute values (obsMax, hourly series) vs differences (mae, bias) use
-      // different converters: temperature deltas scale without the +32 offset.
-      const conv = isTemp ? asTemp : asWind;
-      const dconv = isTemp ? asTempDelta : asWind;
-      const unit = isTemp ? '°' : ` ${windUnit()}`;
-      $('#receipt-sub').textContent =
-        `${receipt.dateKey} · D-1 ${isTemp ? 'temperature' : 'wind'} vs observed · ` +
-        (isTemp ? `high ${fmt(conv(view.obsMax), 1)}°` : `max ${fmt(conv(view.obsMax), 0)} ${windUnit()}`);
-      const cview = {
-        ...view,
-        observed: view.observed.map(conv),
-        models: view.models.map((m) => ({ ...m, series: m.series.map(conv) })),
-      };
-      chartEl.innerHTML = receiptLineChart(cview, receipt.hours, isTemp ? '°' : '');
-      capEl.innerHTML =
-        `hourly D-1 forecasts vs observed · brightest line = closest model · ` +
-        `<span class="key key-obs"></span> observed · ± = mean hourly error, signed = bias` +
-        (hasCommercialStandings ? ' · raw-call view intentionally excludes commercial providers' : '');
-      gridEl.innerHTML = view.models
-        .map(
-          (c, i) => `<div class="call${i === 0 ? '' : ' call-dim'}">
-            <span class="mdot" style="background:${esc(c.model.color)}"></span>
-            <span class="call-label">${esc(c.model.label)}</span>
-            <span class="num">±${fmt(dconv(c.mae), 1)}${esc(unit)}</span>
-            <span class="num call-delta">${fmtSigned(dconv(c.bias), 1)}${esc(unit)}</span>
-            <span class="call-verdict">${i === 0 ? '<span class="call-star">★</span>' : ''}</span>
-          </div>`,
-        )
-        .join('');
-    }
-  };
-  draw(receipt.defaultMetric);
-
-  for (const btn of container.querySelectorAll('.metric-tabs button')) {
-    btn.addEventListener('click', () => {
-      for (const b of container.querySelectorAll('.metric-tabs button')) b.classList.remove('active');
-      btn.classList.add('active');
-      draw(btn.dataset.metric);
-    });
-  }
 }
 
 // ── Skill by lead time ───────────────────────────────────────────────────────

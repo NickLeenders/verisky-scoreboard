@@ -30,6 +30,7 @@ import {
   RAMP_STEPS,
 } from '../js/leadTimeGrid.js';
 import { hydratePresetScoreboard } from '../js/server-scoreboard.js';
+import { buildComparison, rainTiming, valueStrip } from '../js/compare.js';
 
 let checks = 0;
 const ok = (label, fn) => {
@@ -385,6 +386,60 @@ ok('the horizon factor and lead weighting are unchanged', () => {
   assert.equal(SCORE_CONFIG.eventWeight, 0.3);
   assert.equal(SCORE_CONFIG.minEventHours, 8);
   assert.deepEqual([...LEAD_DAYS], [1, 2, 3, 4, 5, 6, 7]);
+});
+
+// ── Historical Compare ─────────────────────────────────────────────────────
+
+const compareFixture = () => {
+  const dates = ['2026-10-01', '2026-10-03']; // navigation must allow gaps
+  const model = { id: 'test', label: 'Test', color: '#123456' };
+  const truthHours = dates.flatMap((dateKey, d) => Array.from({ length: 24 }, (_, h) => ({
+    time: `${dateKey}T${String(h).padStart(2, '0')}:00`, dateKey,
+    temperature: 10 + d + h / 2, wind: h, precipitation: h === 12 ? 1 : 0,
+  })));
+  const rows = (lead) => truthHours.map((truth) => ({ time: truth.time, dateKey: truth.dateKey, truth,
+    pred: { temperature: truth.temperature + lead, wind: truth.wind + lead, precipitation: truth.precipitation } }));
+  return { scoredDates: dates, roster: [model], truthHours, pairs: { test: { 1: rows(1), 3: rows(3) } } };
+};
+
+ok('Compare selects the requested historical day and forecast lead independently', () => {
+  const a = compareFixture();
+  const first = buildComparison(a, '2026-10-01', 3, ['test']);
+  const last = buildComparison(a, '2026-10-03', 1, ['test']);
+  assert.equal(first.observed.temperature, 21.5);
+  assert.equal(first.models[0].temperature, 24.5);
+  assert.equal(last.observed.temperature, 22.5);
+  assert.equal(last.models[0].temperature, 23.5);
+  assert.equal(buildComparison(a, '2026-10-02', 1, ['test']), null);
+  assert.equal(buildComparison(a, '2026-10-01', 8, ['test']), null);
+  assert.equal(buildComparison(a, '2026-10-01', 1, []).models.length, 0);
+});
+
+ok('Compare keeps gaps at the right hour and never counts missing rain as dry', () => {
+  const a = compareFixture();
+  a.pairs.test[1] = a.pairs.test[1].filter((r) => !r.time.endsWith('T06:00'));
+  const view = buildComparison(a, '2026-10-01', 1, ['test']);
+  assert.equal(view.hours.length, 24);
+  assert.deepEqual(view.rain.obsSegments, [{ start: 12, end: 12 }]);
+  assert.equal(view.rain.models.length, 0);
+  const missingLead = buildComparison(a, '2026-10-01', 7, ['test']);
+  assert.equal(missingLead.models[0].temperature, null);
+  a.truthHours[12].precipitation = null;
+  assert.equal(buildComparison(a, '2026-10-01', 1, ['test']).rain, null);
+});
+
+ok('Compare rejects thin daily highs and follows Verify rain timing tolerance', () => {
+  const a = compareFixture();
+  a.pairs.test[1] = a.pairs.test[1].slice(0, 19);
+  assert.equal(buildComparison(a, '2026-10-01', 1, ['test']).models[0].temperature, null);
+  assert.equal(rainTiming([], []), 1);
+  assert.equal(rainTiming([13], [12]), 1);
+  assert.equal(rainTiming([15], [12]), 0);
+  assert.equal(rainTiming([], [12]), 0);
+  assert.equal(rainTiming([12], []), 0);
+  const strip = valueStrip([{ model: a.roster[0], value: 0 }], 0, { unit: '°C', minSpan: 6 });
+  assert(strip.includes('Observed: 0 °C'));
+  assert(!strip.includes('NaN'));
 });
 
 console.log(`\n${checks} checks passed`);

@@ -265,8 +265,8 @@ export function leadDayAtClientX(svg, clientX) {
  * @param {string[]} hours  "HH:MM" labels for the observed hour axis.
  */
 export function receiptRainChart(view, hours, { width = 560, rainUnit = 'mm', decimals = 1 } = {}) {
-  const L = 44;
-  const R = 60;
+  const L = 85;
+  const R = 70;
   const T = 6;
   const B = 22;
   const laneH = 24;
