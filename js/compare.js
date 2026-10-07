@@ -9,9 +9,9 @@ const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({
 })[c]);
 const finite = Number.isFinite;
 const MAX_MODELS = 5;
-const max = (values) => {
+const max = (values, minimum = 20) => {
   const valid = values.filter(finite);
-  return valid.length >= 20 ? Math.max(...valid) : null;
+  return valid.length >= minimum && valid.length > 0 ? Math.max(...valid) : null;
 };
 const wet = (values) => values.flatMap((v, i) => finite(v) && v >= 0.2 ? [i] : []);
 const segments = (indices) => {
@@ -37,19 +37,23 @@ export function rainTiming(predicted, observed) {
 }
 
 export function buildComparison(aligned, dateKey, leadDay, modelIds, commercial = []) {
-  if (!aligned.scoredDates.includes(dateKey) || !LEAD_DAYS.includes(leadDay)) return null;
+  const today = aligned.today?.dateKey === dateKey ? aligned.today : null;
+  if ((!today && !aligned.scoredDates.includes(dateKey)) || !LEAD_DAYS.includes(leadDay)) return null;
+  const source = today || aligned;
+  const hourCount = today ? today.hourCount : 24;
+  const high = (values) => max(values, today ? hourCount : 20);
   // Keep missing hours in their actual clock positions, never compress a gap.
-  const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
-  const truth = new Map(aligned.truthHours.filter((r) => r.dateKey === dateKey).map((r) => [r.time, r]));
+  const hours = Array.from({ length: hourCount }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+  const truth = new Map(source.truthHours.filter((r) => r.dateKey === dateKey).map((r) => [r.time, r]));
   const observed = hours.map((h) => truth.get(`${dateKey}T${h}`));
   const obsRain = observed.map((r) => r?.precipitation);
   const observedWet = wet(obsRain);
-  const rain = obsRain.every(finite) ? {
+  const rain = hourCount > 0 && obsRain.every(finite) ? {
     observedTotal: obsRain.reduce((a, b) => a + b, 0),
     obsSegments: segments(observedWet), models: [],
   } : null;
   const models = aligned.roster.filter((m) => modelIds.includes(m.id)).map((model) => {
-    const pairs = new Map((aligned.pairs[model.id]?.[leadDay] ?? [])
+    const pairs = new Map((source.pairs[model.id]?.[leadDay] ?? [])
       .filter((r) => r.dateKey === dateKey).map((r) => [r.time, r.pred]));
     const pred = hours.map((h) => pairs.get(`${dateKey}T${h}`));
     const precipitation = pred.map((r) => r?.precipitation);
@@ -59,9 +63,10 @@ export function buildComparison(aligned, dateKey, leadDay, modelIds, commercial 
       rain.models.push({ model, segments: segments(predictedWet),
         total: precipitation.reduce((a, b) => a + b, 0), timing, correct: timing >= 0.5 });
     }
-    return { model, temperature: max(pred.map((r) => r?.temperature)), wind: max(pred.map((r) => r?.wind)) };
+    return { model, temperature: high(pred.map((r) => r?.temperature)), wind: high(pred.map((r) => r?.wind)) };
   });
-  for (const row of commercial.filter((row) => modelIds.includes(row.model.id))) {
+  for (const summary of commercial.filter((row) => modelIds.includes(row.model.id))) {
+    const row = today ? { model: summary.model, temperature: null, wind: null, rain: null } : summary;
     models.push({ model: row.model, temperature: row.temperature, wind: row.wind });
     if (rain && row.rain) {
       const predictedWet = row.rain.segments.flatMap(({ start, end }) => Array.from({ length: end - start + 1 }, (_, i) => start + i));
@@ -71,7 +76,7 @@ export function buildComparison(aligned, dateKey, leadDay, modelIds, commercial 
   }
   rain?.models.sort((a, b) => b.timing - a.timing);
   return { dateKey, leadDay, hours, models, rain,
-    observed: { temperature: max(observed.map((r) => r?.temperature)), wind: max(observed.map((r) => r?.wind)) } };
+    observed: { temperature: high(observed.map((r) => r?.temperature)), wind: high(observed.map((r) => r?.wind)) } };
 }
 
 /** One shared scale, grouped equal values, and staggered labels like Verify. */
@@ -149,18 +154,21 @@ export function renderComparison(aligned, standings, city) {
     observer.observe(container);
   }
   const chartWidth = Math.max(280, container.clientWidth - 24);
-  const dates = aligned.scoredDates;
+  const dates = [...aligned.scoredDates];
+  if (aligned.today && !dates.includes(aligned.today.dateKey)) dates.push(aligned.today.dateKey);
   if (!dates.length) {
-    container.innerHTML = '<p class="empty">No completed days available to compare.</p>';
+    container.innerHTML = '<p class="empty">No days available to compare.</p>';
     return;
   }
   if (!dates.includes(state.date)) state.date = dates.at(-1);
+  const isToday = state.date === aligned.today?.dateKey;
   const slug = siteSlug(city);
-  const key = slug ? `${slug}:${state.date}:${state.lead}` : null;
+  const commercialEnabled = slug && !isToday;
+  const key = commercialEnabled ? `${slug}:${state.date}:${state.lead}` : null;
   if (key !== commercialState.key) {
     const request = ++commercialRequest;
-    commercialState = { key, status: slug ? 'loading' : 'idle', models: [] };
-    if (slug) fetchPresetCompare(city, state.date, state.lead).then((models) => {
+    commercialState = { key, status: commercialEnabled ? 'loading' : 'idle', models: [] };
+    if (commercialEnabled) fetchPresetCompare(city, state.date, state.lead).then((models) => {
       if (request !== commercialRequest) return;
       commercialState = { key, status: 'ready', models };
       if (lastRender) renderComparison(...lastRender);
@@ -178,7 +186,7 @@ export function renderComparison(aligned, standings, city) {
     .map((model) => commercialState.models.find((row) => row.model.id === model.id)
       ?? { model, temperature: null, wind: null, rain: null }) : [];
   const available = [
-    ...aligned.roster.filter((m) => Object.values(aligned.pairs[m.id] ?? {}).some((rows) => rows.length)),
+    ...aligned.roster.filter((m) => [aligned.pairs, aligned.today?.pairs].some((pairs) => Object.values(pairs?.[m.id] ?? {}).some((rows) => rows.length))),
     ...commercial.map((row) => row.model),
   ];
   const modelScores = new Map(standings.map((row) => [row.model.id, finite(row.skill) ? row.skill : -1]));
@@ -192,7 +200,7 @@ export function renderComparison(aligned, standings, city) {
   container.innerHTML = `<div class="compare-controls">
     <div class="compare-dates">
       <button type="button" data-step="-1" aria-label="Previous available day" ${index === 0 ? 'disabled' : ''}>‹</button>
-      <label>Day <select class="compare-date">${[...dates].reverse().map((d) => `<option ${d === state.date ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select></label>
+      <label>Day <select class="compare-date">${[...dates].reverse().map((d) => `<option value="${esc(d)}" ${d === state.date ? 'selected' : ''}>${d === aligned.today?.dateKey ? 'Today so far' : esc(d)}</option>`).join('')}</select></label>
       <button type="button" data-step="1" aria-label="Next available day" ${index === dates.length - 1 ? 'disabled' : ''}>›</button>
     </div>
     <label>Forecast <select class="compare-lead">${LEAD_DAYS.map((lead) => `<option value="${lead}" ${state.lead === lead ? 'selected' : ''}>${lead} day${lead === 1 ? '' : 's'} ahead</option>`).join('')}</select></label>
@@ -202,15 +210,16 @@ export function renderComparison(aligned, standings, city) {
     return `<button type="button" data-model="${esc(m.id)}" aria-pressed="${selected}" ${!state.expanded && i >= MAX_MODELS ? 'hidden' : ''} ${!selected && selectedModels.length >= MAX_MODELS ? 'disabled' : ''}><span class="mdot" style="background:${esc(m.color)}"></span>${esc(m.label)}</button>`;
   }).join('')}</div>
   ${available.length > MAX_MODELS ? `<button type="button" class="compare-models-toggle" aria-expanded="${state.expanded}" aria-controls="compare-models">View ${state.expanded ? 'less' : 'more'}</button>` : ''}
+  ${isToday ? `<p class="compare-hint">Today so far · ${aligned.today.hourCount ? `00:00–${String(aligned.today.hourCount).padStart(2, '0')}:00 local, using completed hours available at the last update.` : 'No completed hours available yet.'} Forecasts and analysis cover the same hours.${slug ? ' Commercial summaries are available for completed days only.' : ''}</p>` : ''}
   <div class="compare-readouts" aria-live="polite"></div>
-  <p class="chart-caption">Public models: previous-runs archive. ${slug ? 'Commercial models: daily summaries from the archived run nearest 06:00 local on the issue day. ' : ''}Green = observed analysis · local hours. Available days: ${esc(dates[0])} to ${esc(dates.at(-1))}.</p>
+  <p class="chart-caption">Public models: previous-runs archive. ${commercialEnabled ? 'Commercial models: daily summaries from the archived run nearest 06:00 local on the issue day. ' : ''}Green = observed analysis · local hours. Available days: ${esc(dates[0])} to ${esc(dates.at(-1))}.</p>
   ${commercialState.status === 'loading' ? '<p class="compare-hint" role="status">Loading commercial models…</p>' : ''}
   ${commercialState.status === 'error' ? '<p class="compare-hint" role="status">Commercial comparison unavailable. <button type="button" class="compare-retry">Retry</button></p>' : ''}
   ${slug && commercialState.status === 'ready' && !commercialState.models.length ? '<p class="compare-hint">No commercial archive data for this day and lead.</p>' : ''}`;
   const comparison = { ...readings, models: readings.models.filter((row) => selectedModels.includes(row.model.id)),
     rain: readings.rain ? { ...readings.rain, models: readings.rain.models.filter((row) => selectedModels.includes(row.model.id)) } : null };
   const readouts = container.querySelector('.compare-readouts');
-  if (!selectedModels.length) readouts.innerHTML = '<p class="empty">Pick a model above to compare its forecast.</p>';
+  if (!selectedModels.length) readouts.innerHTML = `<p class="empty">${isToday ? 'No readings available yet for the selected models.' : 'Pick a model above to compare its forecast.'}</p>`;
   else {
     const rain = comparison.rain;
     readouts.innerHTML = `<section class="compare-reading"><h3>Rain timing <span>${rain ? `${asRain(rain.observedTotal).toFixed(rainDecimals())} ${rainUnit()} observed` : 'Observed unavailable'}</span></h3>${rain?.models.length ? receiptRainChart({ ...rain, observedTotal: asRain(rain.observedTotal), models: rain.models.map((m) => ({ ...m, total: asRain(m.total) })) }, comparison.hours, { rainUnit: rainUnit(), decimals: rainDecimals(), width: chartWidth }) : '<p class="empty">No complete rain data for this selection.</p>'}<p class="chart-caption">Bars = predicted rain · green bands = observed rain · ✓ = timing mostly matches within 1 hour.</p></section>`;
@@ -218,7 +227,7 @@ export function renderComparison(aligned, standings, city) {
       const conv = metric === 'temperature' ? asTemp : asWind;
       const unit = metric === 'temperature' ? tempUnit() : windUnit();
       const obs = comparison.observed[metric] == null ? null : Math.round(conv(comparison.observed[metric]));
-      return `<section class="compare-reading"><h3>Max ${metric} <span>${obs == null ? 'Observed unavailable' : `Observed ${obs} ${unit}`}</span></h3>${valueStrip(comparison.models.map((row) => ({ model: row.model, value: row[metric] == null ? null : Math.round(conv(row[metric])) })), obs, { unit, minSpan: metric === 'temperature' ? 6 : 10, width: chartWidth })}</section>`;
+      return `<section class="compare-reading"><h3>Max ${metric}${isToday ? ' so far' : ''} <span>${obs == null ? 'Observed unavailable' : `Observed ${obs} ${unit}`}</span></h3>${valueStrip(comparison.models.map((row) => ({ model: row.model, value: row[metric] == null ? null : Math.round(conv(row[metric])) })), obs, { unit, minSpan: metric === 'temperature' ? 6 : 10, width: chartWidth })}</section>`;
     }).join('');
     const missing = comparison.models.filter((row) => row.temperature == null || row.wind == null || !rain?.models.some((m) => m.model.id === row.model.id));
     if (missing.length) readouts.innerHTML += `<p class="compare-hint">Some readings unavailable at this date and lead: ${missing.map((r) => esc(r.model.label)).join(', ')}.</p>`;

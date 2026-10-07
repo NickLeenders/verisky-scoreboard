@@ -66,7 +66,7 @@ export function readCache(city) {
   }
   if (!best) return null;
   const fresh =
-    Date.now() - best.fetchedAt < TTL_MS && best.date === utcDate();
+    Date.now() - best.fetchedAt < TTL_MS && best.date === utcDate() && Number.isFinite(best.truth.fetchedAt);
   return { payload: { truth: best.truth, predictions: best.predictions }, fresh };
 }
 

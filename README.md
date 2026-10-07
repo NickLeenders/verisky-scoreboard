@@ -109,7 +109,7 @@ Commercial hourly forecast-vs-observed lab charts remain unavailable.
 
 The Compare card follows VeriSky's Verify readouts: shared number lines for
 daily maximum temperature and wind, plus rain timing lanes. Select up to five
-models (including commercial providers on preset boards), any completed day in
+models (including commercial providers on preset boards), “Today so far” or any completed day in
 the loaded 30-day window, and a forecast
 lead from one to seven days. The three highest-ranked models in the displayed
 standings with daily data are selected automatically, updating with refreshed
@@ -121,7 +121,12 @@ This archive supplies previous-day lead buckets, not the app's exact run-time
 slider. It contains temperature, wind and rain, so the app's sky comparison is
 not shown. Green marks are the scoreboard's observation-fed analysis, including
 on airport boards; airport METAR truth applies only to server aggregate scores.
-Daily highs need at least 20 valid hours; rain totals and timing require a full
+Today so far compares public forecasts and analysis over the same completed
+local hours, capped at the truth fetch time so cached future values never become
+observations. Its highs and rain require all hours in that partial window; no
+hours yet is shown as unavailable. Commercial summaries remain available for
+completed days only. Today stays out of standings and score aggregates.
+Daily highs for completed days need at least 20 valid hours; rain totals and timing require a full
 24-hour local-clock series. Missing readings are labelled rather than treated
 as dry weather. Rain timing uses the app's 0.2 mm threshold and ±1 hour match.
 

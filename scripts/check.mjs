@@ -32,6 +32,7 @@ import {
 } from '../js/leadTimeGrid.js';
 import { hydratePresetScoreboard } from '../js/server-scoreboard.js';
 import { buildComparison, rainTiming, valueStrip, selectComparisonModels } from '../js/compare.js';
+import { alignCity } from '../js/align.js';
 import { hydrateCompare } from '../js/server-compare.js';
 import {
   useLocationUnits, setUnitSystem, unitSystem, asTemp, asTempDelta,
@@ -566,6 +567,36 @@ ok('Compare rejects thin daily highs and follows Verify rain timing tolerance', 
   const strip = valueStrip([{ model: a.roster[0], value: 0 }], 0, { unit: '°C', minSpan: 6 });
   assert(strip.includes('Observed: 0 °C'));
   assert(!strip.includes('NaN'));
+});
+
+ok('Today so far uses location time and fetch cutoff without changing scored days', () => {
+  const times = ['2026-10-06', '2026-10-07'].flatMap((d) => Array.from({ length: 24 }, (_, h) => `${d}T${String(h).padStart(2, '0')}:00`));
+  const values = times.map((_, i) => i % 24);
+  const truth = { times, timezone: 'Asia/Tokyo', fetchedAt: Date.parse('2026-10-06T20:30:00Z'),
+    series: { temperature: values, wind: values, precipitation: values.map(() => 1) } };
+  const model = { id: 'test', label: 'Test', color: '#123456', maxLeadDays: 1 };
+  const predictions = { times, pred: { test: { temperature: { 1: values }, wind: { 1: values }, precipitation: { 1: values.map(() => 2) } } } };
+  const aligned = alignCity(truth, predictions, [model], new Date('2026-10-07T01:00:00Z'));
+  assert.deepEqual(aligned.scoredDates, ['2026-10-06']);
+  assert.equal(aligned.truthHours.length, 24);
+  assert.equal(aligned.pairs.test[1].length, 24);
+  assert.equal(aligned.today.hourCount, 5); // 05:30 at fetch, 10:00 now
+  const view = buildComparison(aligned, '2026-10-07', 1, ['test']);
+  assert.equal(view.hours.length, 5);
+  assert.equal(view.observed.temperature, 4);
+  assert.equal(view.models[0].temperature, 4);
+  assert.equal(view.rain.observedTotal, 5);
+  assert.equal(view.rain.models[0].total, 10);
+  aligned.today.pairs.test[1].pop();
+  const missing = buildComparison(aligned, '2026-10-07', 1, ['test']);
+  assert.equal(missing.models[0].temperature, null);
+  assert.equal(missing.rain.models.length, 0);
+  const midnight = alignCity({ ...truth, fetchedAt: Date.parse('2026-10-06T15:30:00Z') }, predictions, [model], new Date('2026-10-06T15:30:00Z'));
+  const empty = buildComparison(midnight, '2026-10-07', 1, ['test']);
+  assert.equal(empty.observed.temperature, null);
+  assert.equal(empty.rain, null);
+  const stale = alignCity(truth, predictions, [model], new Date('2026-10-08T01:00:00Z'));
+  assert.equal(stale.today.hourCount, 0);
 });
 
 console.log(`\n${checks} checks passed`);

@@ -56,7 +56,18 @@ const MIN_DAILY_HOURS = 20;
  * @param {import('./config.js').ModelConfig[]} roster  The city's model set (§1a).
  * @returns {AlignedCity}
  */
-export function alignCity(truth, predictions, roster) {
+export function alignCity(truth, predictions, roster, now = new Date()) {
+  const localParts = (date) => Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: truth.timezone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date).map(({ type, value }) => [type, value]));
+  const current = localParts(now);
+  const todayDate = `${current.year}-${current.month}-${current.day}`;
+  const fetched = truth.fetchedAt ? localParts(new Date(truth.fetchedAt)) : null;
+  const fetchedDate = fetched && `${fetched.year}-${fetched.month}-${fetched.day}`;
+  const hourCount = fetchedDate === todayDate ? Math.min(Number(current.hour), Number(fetched.hour)) : 0;
+  // Separate current-day pairs keep incomplete days out of every ranking.
+  const today = { dateKey: todayDate, hourCount, truthHours: [], pairs: {} };
   // The most recent local day in the truth series is today — incomplete, drop it.
   const lastDate = truth.times.length > 0 ? dateKeyOf(truth.times[truth.times.length - 1]) : null;
 
@@ -66,7 +77,6 @@ export function alignCity(truth, predictions, roster) {
   for (let i = 0; i < truth.times.length; i++) {
     const time = truth.times[i];
     const dk = dateKeyOf(time);
-    if (dk === lastDate) continue; // incomplete current day
     const temperature = truth.series.temperature[i];
     if (!isNum(temperature)) continue; // no observation, nothing to verify against
     const row = {
@@ -77,7 +87,10 @@ export function alignCity(truth, predictions, roster) {
       wind: isNum(truth.series.wind[i]) ? truth.series.wind[i] : null,
     };
     truthByTime.set(time, row);
-    truthHours.push(row);
+    if (dk === lastDate) {
+      if (dk === todayDate && Number(time.slice(11, 13)) < hourCount) today.truthHours.push(row);
+      else truthByTime.delete(time);
+    } else truthHours.push(row);
   }
 
   // Matched hourly pairs per model × lead day. Temperature anchors the join
@@ -86,6 +99,7 @@ export function alignCity(truth, predictions, roster) {
   const pairs = {};
   for (const model of roster) {
     const perLead = {};
+    const todayPerLead = {};
     const modelPred = predictions.pred[model.id];
     if (modelPred) {
       for (const day of LEAD_DAYS) {
@@ -112,10 +126,14 @@ export function alignCity(truth, predictions, roster) {
             },
           });
         }
-        if (rows.length > 0) perLead[day] = rows;
+        const completedRows = rows.filter((row) => row.dateKey !== lastDate);
+        const todayRows = rows.filter((row) => row.dateKey === todayDate);
+        if (completedRows.length) perLead[day] = completedRows;
+        if (todayRows.length) todayPerLead[day] = todayRows;
       }
     }
     pairs[model.id] = perLead;
+    today.pairs[model.id] = todayPerLead;
   }
 
   // Hourly → daily aggregation, app-style: daily max/min temp, precip sum, wind max.
@@ -141,6 +159,7 @@ export function alignCity(truth, predictions, roster) {
 
   return {
     roster,
+    today,
     scoredDates: Object.keys(dailyTruth).sort(),
     truthHours,
     pairs,

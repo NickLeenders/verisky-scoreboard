@@ -81,6 +81,7 @@ export async function fetchTruth(city) {
   return {
     times: data.hourly.time,
     timezone: data.timezone,
+    fetchedAt: Date.now(),
     series,
   };
 }
