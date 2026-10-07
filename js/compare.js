@@ -213,14 +213,14 @@ export function renderComparison(aligned, standings, city) {
   const readouts = container.querySelector('.compare-readouts');
   if (!selectedModels.length) readouts.innerHTML = '<p class="empty">Pick a model above to compare its forecast.</p>';
   else {
-    readouts.innerHTML = ['temperature', 'wind'].map((metric) => {
+    const rain = comparison.rain;
+    readouts.innerHTML = `<section class="compare-reading"><h3>Rain timing <span>${rain ? `${asRain(rain.observedTotal).toFixed(rainDecimals())} ${rainUnit()} observed` : 'Observed unavailable'}</span></h3>${rain?.models.length ? receiptRainChart({ ...rain, observedTotal: asRain(rain.observedTotal), models: rain.models.map((m) => ({ ...m, total: asRain(m.total) })) }, comparison.hours, { rainUnit: rainUnit(), decimals: rainDecimals(), width: chartWidth }) : '<p class="empty">No complete rain data for this selection.</p>'}<p class="chart-caption">Bars = predicted rain · green bands = observed rain · ✓ = timing mostly matches within 1 hour.</p></section>`;
+    readouts.innerHTML += ['temperature', 'wind'].map((metric) => {
       const conv = metric === 'temperature' ? asTemp : asWind;
       const unit = metric === 'temperature' ? tempUnit() : windUnit();
       const obs = comparison.observed[metric] == null ? null : Math.round(conv(comparison.observed[metric]));
       return `<section class="compare-reading"><h3>Max ${metric} <span>${obs == null ? 'Observed unavailable' : `Observed ${obs} ${unit}`}</span></h3>${valueStrip(comparison.models.map((row) => ({ model: row.model, value: row[metric] == null ? null : Math.round(conv(row[metric])) })), obs, { unit, minSpan: metric === 'temperature' ? 6 : 10, width: chartWidth })}</section>`;
     }).join('');
-    const rain = comparison.rain;
-    readouts.innerHTML += `<section class="compare-reading"><h3>Rain timing <span>${rain ? `${asRain(rain.observedTotal).toFixed(rainDecimals())} ${rainUnit()} observed` : 'Observed unavailable'}</span></h3>${rain?.models.length ? receiptRainChart({ ...rain, observedTotal: asRain(rain.observedTotal), models: rain.models.map((m) => ({ ...m, total: asRain(m.total) })) }, comparison.hours, { rainUnit: rainUnit(), decimals: rainDecimals(), width: chartWidth }) : '<p class="empty">No complete rain data for this selection.</p>'}<p class="chart-caption">Bars = predicted rain · green bands = observed rain · ✓ = timing mostly matches within 1 hour.</p></section>`;
     const missing = comparison.models.filter((row) => row.temperature == null || row.wind == null || !rain?.models.some((m) => m.model.id === row.model.id));
     if (missing.length) readouts.innerHTML += `<p class="compare-hint">Some readings unavailable at this date and lead: ${missing.map((r) => esc(r.model.label)).join(', ')}.</p>`;
   }

@@ -471,7 +471,7 @@ th.c-metric, th.c-record { text-align: right; }
 .compare-controls select { font-size: 0.8rem; }
 .compare-controls button:disabled, .compare-models button:disabled { opacity: 0.35; cursor: default; }
 .compare-models { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
-.compare-models button { display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; }
+.compare-models button { display: flex; align-items: center; gap: 0.3rem; padding: 0.35rem 0.45rem; min-height: 32px; font-size: 0.74rem; }
 .compare-models button[hidden] { display: none; }
 .compare-models-toggle { margin-bottom: 0.8rem; }
 .compare-models button[aria-pressed="true"] { border-color: var(--text-2); color: var(--text); background: var(--surface-light); }
