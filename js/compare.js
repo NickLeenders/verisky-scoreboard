@@ -116,13 +116,13 @@ export function valueStrip(items, observed, { unit, minSpan, width = 560 }) {
   return `<svg viewBox="0 0 ${width} ${axisY + 32}" role="img" aria-label="Forecast daily highs in ${esc(unit)} compared with observed">${parts.join('')}</svg>`;
 }
 
-let state = { date: null, lead: 1, models: null };
+let state = { date: null, lead: 1, models: null, expanded: false };
 let lastRender = null;
 let observer = null;
 let commercialRequest = 0;
 let commercialState = { key: null, status: 'idle', models: [] };
 export function resetComparison() {
-  state = { date: null, lead: 1, models: null };
+  state = { date: null, lead: 1, models: null, expanded: false };
   lastRender = null;
   commercialRequest++;
   commercialState = { key: null, status: 'idle', models: [] };
@@ -181,6 +181,8 @@ export function renderComparison(aligned, standings, city) {
     ...aligned.roster.filter((m) => Object.values(aligned.pairs[m.id] ?? {}).some((rows) => rows.length)),
     ...commercial.map((row) => row.model),
   ];
+  const modelScores = new Map(standings.map((row) => [row.model.id, finite(row.skill) ? row.skill : -1]));
+  available.sort((a, b) => (modelScores.get(b.id) ?? -1) - (modelScores.get(a.id) ?? -1));
   const readings = buildComparison(aligned, state.date, state.lead, available.map((m) => m.id), commercial);
   const withDailyData = available.filter((model) => readings.models.some((row) => row.model.id === model.id
     && (row.temperature != null || row.wind != null)) || readings.rain?.models.some((row) => row.model.id === model.id));
@@ -196,10 +198,11 @@ export function renderComparison(aligned, standings, city) {
     <label>Forecast <select class="compare-lead">${LEAD_DAYS.map((lead) => `<option value="${lead}" ${state.lead === lead ? 'selected' : ''}>${lead} day${lead === 1 ? '' : 's'} ahead</option>`).join('')}</select></label>
   </div>
   <p class="compare-hint">The top three ranked models with daily data are selected automatically. Pick up to five models to compare.</p>
-  <div class="compare-models" role="group" aria-label="Models to compare">${available.map((m) => {
+  <div id="compare-models" class="compare-models" role="group" aria-label="Models to compare, highest score first">${available.map((m, i) => {
     const selected = selectedModels.includes(m.id);
-    return `<button type="button" data-model="${esc(m.id)}" aria-pressed="${selected}" ${!selected && selectedModels.length >= MAX_MODELS ? 'disabled' : ''}><span class="mdot" style="background:${esc(m.color)}"></span>${esc(m.label)}</button>`;
+    return `<button type="button" data-model="${esc(m.id)}" aria-pressed="${selected}" ${!state.expanded && i >= MAX_MODELS ? 'hidden' : ''} ${!selected && selectedModels.length >= MAX_MODELS ? 'disabled' : ''}><span class="mdot" style="background:${esc(m.color)}"></span>${esc(m.label)}</button>`;
   }).join('')}</div>
+  ${available.length > MAX_MODELS ? `<button type="button" class="compare-models-toggle" aria-expanded="${state.expanded}" aria-controls="compare-models">View ${state.expanded ? 'less' : 'more'}</button>` : ''}
   <div class="compare-readouts" aria-live="polite"></div>
   <p class="chart-caption">Public models: previous-runs archive. ${slug ? 'Commercial models: daily summaries from the archived run nearest 06:00 local on the issue day. ' : ''}Green = observed analysis · local hours. Available days: ${esc(dates[0])} to ${esc(dates.at(-1))}.</p>
   ${commercialState.status === 'loading' ? '<p class="compare-hint" role="status">Loading commercial models…</p>' : ''}
@@ -225,6 +228,10 @@ export function renderComparison(aligned, standings, city) {
     renderComparison(aligned, standings, city);
     container.querySelector(focusSelector)?.focus();
   };
+  container.querySelector('.compare-models-toggle')?.addEventListener('click', () => {
+    state.expanded = !state.expanded;
+    redraw('.compare-models-toggle');
+  });
   container.querySelector('.compare-date').addEventListener('change', (e) => { state.date = e.target.value; redraw('.compare-date'); });
   container.querySelector('.compare-lead').addEventListener('change', (e) => { state.lead = Number(e.target.value); redraw('.compare-lead'); });
   container.querySelector('.compare-retry')?.addEventListener('click', () => {

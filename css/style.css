@@ -464,7 +464,7 @@ th.c-metric, th.c-record { text-align: right; }
 .compare-controls, .compare-dates { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
 .compare-controls { justify-content: space-between; gap: 0.7rem; }
 .compare-controls label { color: var(--text-3); font-size: 0.78rem; }
-.compare-controls select, .compare-controls button, .compare-models button {
+.compare-controls select, .compare-controls button, .compare-models button, .compare-models-toggle {
   color: var(--text-2); background: var(--surface-mid); border: 1px solid var(--grid);
   border-radius: 7px; padding: 0.45rem 0.55rem; font: inherit; min-height: 36px; cursor: pointer;
 }
@@ -472,6 +472,8 @@ th.c-metric, th.c-record { text-align: right; }
 .compare-controls button:disabled, .compare-models button:disabled { opacity: 0.35; cursor: default; }
 .compare-models { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
 .compare-models button { display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; }
+.compare-models button[hidden] { display: none; }
+.compare-models-toggle { margin-bottom: 0.8rem; }
 .compare-models button[aria-pressed="true"] { border-color: var(--text-2); color: var(--text); background: var(--surface-light); }
 .compare-hint { color: var(--text-3); font-size: 0.76rem; margin: 0.7rem 0 0.45rem; }
 .compare-reading { background: var(--surface-mid); border-radius: 10px; padding: 0.7rem; margin-top: 0.6rem; }
