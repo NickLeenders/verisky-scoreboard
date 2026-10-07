@@ -274,7 +274,7 @@ function renderStandings(aligned, scores, presetBoard) {
     <th>Model</th><th class="c-skill">Skill</th>
     <th class="c-metric">Temp</th><th class="c-metric">${rainOff ? 'Rain*' : 'Rain'}</th><th class="c-metric">Wind</th>
     <th class="c-record" title="correct next-day rain/no-rain calls over the window">Rain W–L</th>
-    <th class="c-form" title="last 7 days · filled dot: next-day skill ≥ 70">Form</th>
+    <th class="c-form"><button type="button" class="form-info-toggle" popovertarget="form-info" aria-label="About recent form">Form <span class="info-icon" aria-hidden="true">i</span></button></th>
   </tr></thead><tbody>`];
 
   for (const r of rows) {

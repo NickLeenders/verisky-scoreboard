@@ -83,7 +83,7 @@ function standingsTableHTML(rows, rainOff) {
     <th class="c-rank">#</th><th class="c-move"></th>
     <th>Model</th><th class="c-skill">Skill</th>
     <th class="c-metric">Temp</th><th class="c-metric">${rainOff ? 'Rain*' : 'Rain'}</th><th class="c-metric">Wind</th>
-    <th class="c-record">Rain W–L</th><th class="c-form">Form</th>
+    <th class="c-record">Rain W–L</th><th class="c-form"><button type="button" class="form-info-toggle" popovertarget="form-info" aria-label="About recent form">Form <span class="info-icon" aria-hidden="true">i</span></button></th>
   </tr></thead><tbody>`;
   const body = rows
     .map((r) => {

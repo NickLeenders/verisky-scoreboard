@@ -317,6 +317,40 @@ th.c-metric, th.c-record { text-align: right; }
 .c-record { text-align: right; color: var(--text-2); }
 
 .c-form { padding-left: 0.9rem; }
+.form-info-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font: 600 10px/1 system-ui, sans-serif;
+}
+.form-info-toggle:hover { color: var(--text); }
+.form-info-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.form-info {
+  width: min(26rem, calc(100vw - 2rem));
+  padding: 1.2rem;
+  border: 1px solid var(--surface-light);
+  border-radius: 10px;
+  background: var(--sheet);
+  color: var(--text);
+  box-shadow: 0 12px 40px #0008;
+}
+.form-info p { color: var(--text-2); margin: 0.6rem 0 1rem; line-height: 1.6; }
+.form-info .retry { margin-left: 0; }
 .fdot {
   display: inline-block;
   width: 7px;
