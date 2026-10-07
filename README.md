@@ -35,8 +35,10 @@ readings around the clock. The topbar's City ⇄ Airport toggle switches between
 them (unavailable views are greyed out), a banner above the standings
 names the station (e.g. *Schiphol (EHAM)*), and `?city=london&site=airport` is
 the shareable URL form. On airport boards the server verifies **temperature and
-wind against the station's own METAR observations** instead of the model
-analysis; rain keeps the analysis. The server publishes them as
+wind against available METAR observations** and rain against archived radar
+where covered. Missing observations fall back to model analysis; older pooled
+scores can retain analysis from before an observation source was connected.
+The server publishes them as
 `/scoreboard/v1/<city>-airport.json` (same shape as the city boards plus a
 `station: { icao, name }` field), and the bake writes matching
 `data/<city>-airport.json` payloads plus `scores.json` entries. Airport
@@ -50,8 +52,17 @@ The UK presets also include Cambridge (city and EGSC airport), Southampton
 (EGHI airport only), and Sumburgh (EGPB airport only). Airport-only presets open
 in Airport mode, disable City, and bake only their `-airport` payload. Custom
 searched locations disable Airport. Lisbon (LPPT), Seattle (KSEA), and Phoenix
-(KPHX) are also airport-only presets. Southampton, Seattle, and Phoenix use
-model analysis rather than METAR truth; their station banners identify this.
+(KPHX) are also airport-only presets. Southampton, Seattle, and Phoenix were
+connected to METAR scoring on 2026-10-07: the observations were already banked,
+but the stations were absent from `airport_panel`. The targeted repair is in
+`scripts/pin-airport-observations.sql`; run it against `verisky_scores` with
+`psql`. It checks that all three stations and score cells exist before pinning
+them, so later panel rebuilds retain them. A score refresh replaces the recent
+14-day window; older pooled scores can retain model truth until they age out.
+If the public scoreboard endpoint is unavailable, the browser still computes
+scores against model analysis and the station banner explicitly identifies
+that fallback. The banner switches to observation sourcing only after a valid
+server scoreboard for that airport arrives.
 Airport-only locations are excluded from the city-only long-term history page.
 
 You can also run the scoring outside the browser with Node 18+:

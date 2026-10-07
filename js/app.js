@@ -223,6 +223,7 @@ function renderError(error) {
 
 function render(city, { aligned, scores, timezone, presetBoard = null }) {
   lastRender = { city, aligned, scores, timezone, presetBoard };
+  syncSiteUi(city, presetBoard);
   const dates = aligned.scoredDates;
   const shownDays = presetBoard?.scoredDays ?? dates.length;
   const shownTimezone = presetBoard?.timezone ?? timezone;
@@ -792,7 +793,7 @@ function syncSelector(city) {
 
 // ── City ⇄ Airport site toggle + station banner ─────────────────────────────
 
-function syncSiteUi(city) {
+function syncSiteUi(city, presetBoard) {
   const toggle = $('#site-toggle');
   const banner = $('#site-banner');
   if (!toggle || !banner) return;
@@ -813,13 +814,18 @@ function syncSiteUi(city) {
 
   if (hasAirport && onAirport) {
     const a = city.airport;
+    const source = presetBoard === undefined
+      ? 'Checking the observation-backed scoreboard…'
+      : presetBoard?.station?.icao !== a.icao
+        ? 'These scores use model reconstruction. The observation-backed scoreboard is currently unavailable.'
+        : `${presetBoard.station.truthSource === 'analysis'
+          ? 'Temperature and wind scores use model reconstruction'
+          : 'Temperature and wind scores use available METAR observations'}; rain scores use archived radar where covered. Missing observations and older scores can use model reconstruction. Compare and lab charts use model analysis.`;
     banner.hidden = false;
     banner.innerHTML =
       `<span class="site-banner-icon" aria-hidden="true">✈</span>
       <span class="site-banner-text"><b>${esc(a.name)} (${esc(a.icao)})</b> — ${esc(city.name)}'s
-        airport weather station. ${a.truthSource === 'analysis'
-          ? 'Scores at this airport are verified against the observation-fed model analysis.'
-          : "Temperature and wind on this board are verified against the station's own METAR observations; rain is verified against the model analysis."}</span>` +
+        airport weather station. ${esc(source)}</span>` +
       (a.sameCell
         ? `<span class="site-banner-note">${esc(city.name)}'s city board reads the same grid
           cell — the airport is the city's measurement point.</span>`

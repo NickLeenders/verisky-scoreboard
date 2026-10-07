@@ -351,6 +351,16 @@ const payload = (standings) => ({
   standings,
 });
 
+ok('airport payloads preserve analysis provenance for honest source labels', () => {
+  const body = { ...payload([serverRow('ecmwf_ifs025', 80, 85)]),
+    station: { icao: 'EHAM', name: 'Schiphol', truthSource: 'analysis' } };
+  assert.equal(hydratePresetScoreboard(body, 'amsterdam').station.truthSource, 'analysis');
+  delete body.station.truthSource;
+  assert.equal(hydratePresetScoreboard(body, 'amsterdam').station.truthSource, undefined);
+  delete body.station;
+  assert.equal(hydratePresetScoreboard(body, 'amsterdam').station, null);
+});
+
 ok('a dual payload renders v2, re-ranks by it, and keeps v1 for the comparison', () => {
   const board = hydratePresetScoreboard(
     payload([serverRow('ecmwf_aifs025_single', 80, 60), serverRow('knmi_seamless', 70, 75)]),

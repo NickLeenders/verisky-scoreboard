@@ -186,10 +186,13 @@ map.on('click', async event => {
   const seq = ++pointSequence;
   const station = nearestStation(event.latlng);
   if (station) {
-    const analysisOnly = CITIES.find(c => c.airport?.icao === station.icao)?.airport.truthSource === 'analysis';
-    const truth = analysisOnly ? 'Verified against model analysis'
-      : state.metric === 'combined' ? 'Temperature & wind vs station observations · rain & sun vs analysis'
-      : stations.truth?.[state.metric] === 'metar' ? 'Verified against station observations' : 'Verified against model analysis';
+    const truth = state.metric === 'combined'
+      ? 'Temperature & wind: available METAR · rain: radar where covered · sun: analysis. Gaps and older scores can use model analysis.'
+      : state.metric === 'rain'
+        ? 'Archived radar where covered; model analysis for gaps and older scores'
+        : stations.truth?.[state.metric] === 'metar'
+          ? 'Available station observations; model analysis for gaps and older scores'
+          : 'Verified against model analysis';
     popup(event.latlng, popupBody(`${station.icao} · ${station.name}`, stationRows(station), station.metrics?.[state.metric]?.blend,
       `${truth} · ${String(station.asOf).slice(0, 10)}`, station));
     return;

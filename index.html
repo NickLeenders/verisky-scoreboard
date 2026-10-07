@@ -342,10 +342,11 @@
             a week ago (the window minus its last 7 days).</p>
           <p><b>Airport boards (the ✈ toggle)</b> re-score every model at the city's main
             airport, whose METAR weather station reports real instrument readings around the
-            clock. Unless the station banner says otherwise, the server verifies <b>temperature and wind against the
-            station's own METAR observations</b> instead of the model analysis — actual
-            thermometer-and-anemometer truth — while rain keeps the analysis (METAR
-            precipitation groups are too sparse to score against). The in-browser charts
+            clock at most airports. The server verifies <b>temperature and wind against available
+            METAR observations</b> and rain against archived radar where covered. Missing
+            observations fall back to model analysis; older scores can also retain analysis
+            from before a station or radar source was connected. METAR precipitation groups
+            are too sparse for the server's rain scoring. The in-browser charts
             (Compare, labs) still compare public models to the analysis at the airport's
             coordinates, so their curves can differ slightly from the standings. Chicago,
             Mexico City and Sydney's city boards already sit on their airport's grid cell,
