@@ -117,6 +117,7 @@ async function loadCity(city) {
   useLocationUnits(city);
   syncUnitToggle();
   currentCity = city;
+  setStandingsExpanded(false);
   resetComparison();
   history.replaceState(null, '', urlForCity(city));
   $('#score-map-link').href = `map.html${urlForCity(city)}`;
@@ -254,6 +255,13 @@ function rerender() {
 
 // ── Standings table ──────────────────────────────────────────────────────────
 
+function setStandingsExpanded(expanded) {
+  $('#standings').classList.toggle('expanded', expanded);
+  const button = $('#standings-toggle');
+  button.setAttribute('aria-expanded', String(expanded));
+  button.textContent = expanded ? 'View less' : 'View more';
+}
+
 function renderStandings(aligned, scores, presetBoard) {
   const rows = presetBoard?.rows ?? buildStandings(aligned, scores);
   const shownScores = presetBoard?.scores ?? scores;
@@ -339,6 +347,9 @@ function renderStandings(aligned, scores, presetBoard) {
 // ── Lab panel (expands in place from a standings row) ────────────────────────
 
 function toggleLab(tr) {
+  if ([...tr.parentElement.querySelectorAll('.standing')].indexOf(tr) >= 5) {
+    setStandingsExpanded(true);
+  }
   const labRow = tr.nextElementSibling;
   const open = labRow.hidden;
   // Close any other open lab first — one lab at a time keeps the table readable.
@@ -939,4 +950,7 @@ function initUnitToggle() {
 initTopBar();
 initSiteToggle();
 initUnitToggle();
+$('#standings-toggle').addEventListener('click', () => {
+  setStandingsExpanded(!$('#standings').classList.contains('expanded'));
+});
 loadCity(cityFromUrl());
