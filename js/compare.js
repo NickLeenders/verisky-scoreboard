@@ -197,7 +197,6 @@ export function renderComparison(aligned, standings, city) {
     </div>
     <label>Forecast <select class="compare-lead">${LEAD_DAYS.map((lead) => `<option value="${lead}" ${state.lead === lead ? 'selected' : ''}>${lead} day${lead === 1 ? '' : 's'} ahead</option>`).join('')}</select></label>
   </div>
-  <p class="compare-hint">The top three ranked models with daily data are selected automatically. Pick up to five models to compare.</p>
   <div id="compare-models" class="compare-models" role="group" aria-label="Models to compare, highest score first">${available.map((m, i) => {
     const selected = selectedModels.includes(m.id);
     return `<button type="button" data-model="${esc(m.id)}" aria-pressed="${selected}" ${!state.expanded && i >= MAX_MODELS ? 'hidden' : ''} ${!selected && selectedModels.length >= MAX_MODELS ? 'disabled' : ''}><span class="mdot" style="background:${esc(m.color)}"></span>${esc(m.label)}</button>`;
