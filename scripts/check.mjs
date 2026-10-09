@@ -362,6 +362,17 @@ ok('airport payloads preserve analysis provenance for honest source labels', () 
   assert.equal(hydratePresetScoreboard(body, 'amsterdam').station, null);
 });
 
+ok('coastal tracking preserves the pending-observation label without claiming station truth', () => {
+  const body = { ...payload([serverRow('ecmwf_ifs025', 80, 85)]),
+    city: { id: 'tarifa', name: 'Tarifa' },
+    observationStatus: 'Scores use model analysis; station scoring is pending.' };
+  const board = hydratePresetScoreboard(body, 'tarifa');
+  assert.equal(board.observationStatus, body.observationStatus);
+  assert.equal(board.station, null);
+  body.observationStatus = { invalid: true };
+  assert.equal(hydratePresetScoreboard(body, 'tarifa').observationStatus, null);
+});
+
 ok('a dual payload renders v2, re-ranks by it, and keeps v1 for the comparison', () => {
   const board = hydratePresetScoreboard(
     payload([serverRow('ecmwf_aifs025_single', 80, 60), serverRow('knmi_seamless', 70, 75)]),

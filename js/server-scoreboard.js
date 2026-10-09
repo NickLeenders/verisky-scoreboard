@@ -180,6 +180,7 @@ export function hydratePresetScoreboard(payload, expectedCityId) {
 
   return {
     city: payload.city,
+    observationStatus: typeof payload.observationStatus === 'string' ? payload.observationStatus : null,
     // Airport boards only: the METAR weather station behind the board's cell.
     station: payload.station && typeof payload.station.icao === 'string'
       ? { icao: payload.station.icao, name: String(payload.station.name ?? payload.station.icao),

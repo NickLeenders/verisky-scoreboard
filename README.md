@@ -86,6 +86,32 @@ payload's dual-score hydration in both directions.
 them into `index.html` so a fresh visit shows real numbers right away instead of
 loading skeletons. The page works fine without it.
 
+### Kite destination tracking
+
+Five kite destinations were enrolled for recurring forecast collection on
+2026-10-09 and published as fixed scoreboard presets:
+
+| Board | Public API slug | Measurement / current scoring source |
+| --- | --- | --- |
+| Maui / Kanaha | `maui-airport` | Kahului Airport PHOG, 20.8887, -156.43453; available METAR temperature and wind |
+| Cape Hatteras | `hatteras-airport` | Billy Mitchell Airport KHSE in Frisco, 35.23238, -75.6223; available METAR temperature and wind |
+| Tarifa | `tarifa` | 36.014444, -5.597222; model analysis, AEMET 6001 observation connection pending |
+| IJmuiden | `ijmuiden` | 52.463, 4.555; model analysis, collected KNMI 06225 wind not yet used in scoring |
+| Perth / Swanbourne | `swanbourne` | -31.96, 115.76; model analysis, current SYNOP 94614 feed only four reports daily |
+
+Open with `?city=maui`, `?city=hatteras`, `?city=tarifa`, `?city=ijmuiden`
+or `?city=swanbourne`. Maui and Hatteras default to their airport boards.
+Hatteras uses KHSE rather than the originally proposed NOAA coastal station
+HCGN7; the board names the actual station. These airport readings are not
+measurements at every nearby kite launch.
+
+The three coastal presets carry `observationStatus` in the aggregate API;
+the site preserves that explanation in a visible banner, including during
+server fallback. Registering forecasts does not imply station verification.
+Commercial history builds from enrollment; public models can have older
+archived runs. Run `scripts/pin-kite-observations.sql` after registering the
+airport cells to retain their METAR connections across airport-panel rebuilds.
+
 ### Commercial score boundary
 
 The browser never receives full commercial forecasts or provider credentials.

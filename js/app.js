@@ -830,6 +830,9 @@ function syncSiteUi(city, presetBoard) {
         ? `<span class="site-banner-note">${esc(city.name)}'s city board reads the same grid
           cell — the airport is the city's measurement point.</span>`
         : '');
+  } else if (city.observationStatus) {
+    banner.hidden = false;
+    banner.innerHTML = `<span class="site-banner-text"><b>Coastal forecast tracking</b> · ${esc(presetBoard?.observationStatus ?? city.observationStatus)}</span>`;
   } else {
     banner.hidden = true;
     banner.innerHTML = '';

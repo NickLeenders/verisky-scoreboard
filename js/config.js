@@ -213,6 +213,19 @@ export function resolveRoster(city) {
  * unaffected.
  */
 export const CITIES = [
+  // Kite destinations: coordinates match the server's fixed presets.
+  { id: 'maui', name: 'Maui / Kanaha', lat: 20.8887, lon: -156.43453, country: 'US',
+    site: 'airport', cityAvailable: false,
+    airport: { icao: 'PHOG', name: 'Kahului Airport', lat: 20.8887, lon: -156.43453 } },
+  { id: 'hatteras', name: 'Cape Hatteras', lat: 35.23238, lon: -75.6223, country: 'US',
+    site: 'airport', cityAvailable: false,
+    airport: { icao: 'KHSE', name: 'Billy Mitchell Airport (Frisco)', lat: 35.23238, lon: -75.6223 } },
+  { id: 'tarifa', name: 'Tarifa', lat: 36.014444, lon: -5.597222, country: 'ES',
+    observationStatus: 'Forecast tracking is active. Scores use model analysis; AEMET Tarifa station 6001 is not connected to scoring yet.' },
+  { id: 'ijmuiden', name: 'IJmuiden', lat: 52.463, lon: 4.555, country: 'NL',
+    observationStatus: 'Forecast tracking is active. KNMI IJmuiden wind observations are being collected, but scores still use model analysis pending station validation.' },
+  { id: 'swanbourne', name: 'Perth / Swanbourne', lat: -31.96, lon: 115.76, country: 'AU',
+    observationStatus: 'Forecast tracking is active. Swanbourne observations arrive four times daily through the current feed; scores use model analysis pending a suitable station-scoring connection.' },
   // Europe
   { id: 'amsterdam', name: 'Amsterdam', lat: 52.37, lon: 4.89, country: 'NL',
     airport: { icao: 'EHAM', name: 'Schiphol', lat: 52.315, lon: 4.79 } },
