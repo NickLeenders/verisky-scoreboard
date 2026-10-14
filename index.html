@@ -268,116 +268,62 @@
 
     <footer class="methodology">
       <p class="method-lede">
-        Every model is verified against the <b>same reference series</b>:
-        Open-Meteo <code>best_match</code> over the past 30 days. For hours that
-        have already happened this is the highest-resolution model available at
-        the location at lead zero, just after it has ingested real observations
-        (stations, radar, satellite). In other words a model reconstruction of
-        the observed weather on a grid, not raw station readings, which is also
-        how forecast centres verify their own models (verification against
-        analysis).
+        All models on a board are checked against the <b>same reference</b>, so
+        the comparison is fair. On city boards that is Open-Meteo's
+        <code>best_match</code> for the past 30 days: for each past hour, the
+        newest run of the highest-resolution model for that location, after it
+        has taken in real observations from stations, radar and satellites. It is
+        a model reconstruction of the weather rather than raw station readings,
+        which is also how forecast centres verify their own models. Airport
+        boards (✈) and Tarifa use real station readings for temperature and wind
+        where available.
       </p>
       <details>
         <summary>How scoring works</summary>
         <div class="method-body">
-          <p><b>Per-lead scores (0 to 100)</b> use the same formulas as the VeriSky app, on hourly
-            forecast/observation pairs over the last 30 days. Temperature and wind are each a
-            blend of two components,
-            <code>0.7&nbsp;·&nbsp;Accuracy&nbsp;+&nbsp;0.3&nbsp;·&nbsp;Extremes</code>; open any
-            row to see the split.</p>
+          <p>Every model's 1- to 7-day forecasts are checked hour by hour against the last
+            30 days of weather and scored 0 to 100, with the same formulas as the VeriSky app.</p>
           <ul>
-            <li><b>Accuracy</b> is the share of hours the forecast landed inside a meaningful
-              band: within <b>2&nbsp;°C</b> for temperature, within
-              <code>max(5&nbsp;km/h, 20%)</code> for wind. Beyond the band a 3&nbsp;°C miss and a
-              9&nbsp;°C miss cost the same.</li>
-            <li><b>Extremes</b> is <a href="https://doi.org/10.1175/WAF-D-10-05030.1">SEDI</a>, an
-              event score computed over the hours that were unusual <i>for this location</i>
-              (a temperature anomaly or a wind speed beyond roughly the local 90th percentile,
-              with floors of 3&nbsp;°C and 20&nbsp;km/h). It counts <b>false alarms</b> as well
-              as catches, so a model cannot win it by crying wolf. A calm window has no extremes
-              to judge: the component needs at least 8 event and 8 quiet hours, and where it has
-              fewer, its weight folds back into Accuracy.</li>
-            <li><b>Rain:</b> F1 of rain/no-rain calls at a 0.1&nbsp;mm/h threshold with a
-              0.1&nbsp;mm deadband (drizzle right at the threshold is a coin flip, not skill).
-              Rain is only scored when the window had a genuine rain signal
-              (≥&nbsp;3 rain-event hours totalling ≥&nbsp;1&nbsp;mm), since otherwise every model
-              would ace a dry month, and only for models whose own sample holds at least 8
-              observed wet hours.</li>
-            <li><b>Sharpness</b> (in the expanded row, deliberately <i>not</i> in the score) is
-              how much the forecast series moves compared with the observed one. 1.0× moves like
-              the weather; a much lower number is a forecast hedging toward an average. It stays
-              out of the headline because it is a property, not an accuracy: scoring it would
-              just invite the opposite game.</li>
+            <li><b>Temperature and wind</b> are 70% <b>Accuracy</b> + 30% <b>Extremes</b>
+              (open a row to see the split).
+              Accuracy is how often the forecast was close: within 2&nbsp;°C, or within
+              5&nbsp;km/h or 20% for wind.
+              Extremes (<a href="https://doi.org/10.1175/WAF-D-10-05030.1">SEDI</a>) checks
+              whether the model caught the unusual hours for that place, and counts false
+              alarms against it. In a month too calm to judge, Accuracy takes its weight.</li>
+            <li><b>Rain</b> scores each hour's rain/no-rain call (F1 at 0.1&nbsp;mm/h). It only
+              counts when the month actually had some rain; otherwise every model would ace
+              a dry month.</li>
+            <li><b>Sharpness</b> (in the expanded row, not in the score) shows whether the
+              forecast swings as much as the real weather. 1.0× is right; much lower means
+              the model is hedging toward an average.</li>
           </ul>
-          <p><b>Why not RMSE?</b> Root-mean-square error, which this board used until
-            August 2026, is minimized by the conditional mean — so a model that hedges toward a
-            smooth average is playing the metric optimally, and a sharp forecast that is slightly
-            off in time or place is punished twice (a miss <i>and</i> a false alarm) where a
-            blurred one is punished once. That is the documented reason MSE-trained AI models can
-            top an error leaderboard while looking like a blurry mess on a map
-            (<a href="https://doi.org/10.1175/BAMS-D-23-0162.1">Ben Bouallègue et al. 2024</a>,
-            <a href="https://doi.org/10.1029/2023GL107377">Bonavita 2024</a>). Scoring only the
-            hours where something happened is not the fix either — selecting hours on the
-            observations rewards whoever over-forecasts drama
-            (<a href="https://doi.org/10.1214/16-STS588">Lerch et al. 2017</a>) — which is why
-            Extremes is a contingency table with false alarms in it. The old error score is still
-            computed: each expanded row says where the model would have ranked under it, and the
-            <a href="history.html">long-term trends</a> page still charts it, because a
-            five-year comparison needs a yardstick that cannot move with the season.</p>
-          <p><b>The headline Skill number</b> is a soft horizon-adjusted score. First,
-            each model gets its 1/d-weighted score over the lead days it actually serves.
-            Then that score is multiplied by <code>0.75&nbsp;+&nbsp;0.25·C</code>, where
-            <code>C</code> is the share of the full 1/d-weighted 7-day horizon it covers.
-            Tomorrow counts 7× as much as next week, which is roughly how much people lean
-            on each, while accurate longer-range forecasts still add points. A perfect
-            D-1-only model can score about 85 instead of being treated as a failed 7-day
-            model; a perfect D-1…D-7 model can reach 100. Per-metric columns use the same
-            weighting.</p>
-          <p><b>Skill by lead time</b> shows the numbers behind that weighting, in the app's two
-            views. The <b>grid</b> is a models × lead-days matrix: brightness is the score, so
-            reading down a column answers "who do I trust three days out" and reading across a row
-            shows the decay. Its bands are fixed (temperature and wind step at 50/60/70/80, rain at
-            30/40/50/60, since an F1 rain score genuinely lives lower), so a cell means the same
-            thing on every board. A blank cell is a lead day the model doesn't serve, and a model
-            that stops early gets a muted average — it is only being scored on the easy near days,
-            which is exactly why the column headers sort the grid too. The <b>curves</b> view draws
-            every model but colours at most four: a preset board carries thirteen, and thirteen
-            hues cannot be told apart, so the rest stay one context gray instead of pretending to
-            be readable.</p>
-          <p><b>Rain W–L and form dots</b> are next-day (D-1) only, since "did it rain the next
-            day" is the question most people care about. A win is a correct daily rain/no-rain
-            call at 0.1&nbsp;mm; a form dot fills when that day's next-day skill ≥ 70.
-            The ▲▼ movement column compares today's ranking with the same table computed
-            a week ago (the window minus its last 7 days).</p>
-          <p><b>Airport boards (the ✈ toggle)</b> re-score every model at the city's main
-            airport, whose METAR weather station reports real instrument readings around the
-            clock at most airports. The server verifies <b>temperature and wind against available
-            METAR observations</b> and rain against archived radar where covered. Missing
-            observations fall back to model analysis; older scores can also retain analysis
-            from before a station or radar source was connected. METAR precipitation groups
-            are too sparse for the server's rain scoring. The in-browser charts
-            (Compare, labs) still compare public models to the analysis at the airport's
-            coordinates, so their curves can differ slightly from the standings. Chicago,
-            Mexico City and Sydney's city boards already sit on their airport's grid cell,
-            so for them the two views read the same measurement point. Airport standings
-            started accruing later than the city boards at some airports, so a shorter
-            "last N days" window there is expected until the archive fills. Unavailable city
-            or airport views are greyed out in the toggle.</p>
-          <p>Public-model forecasts come from Open-Meteo's
+          <p><b>Skill</b> combines the lead days, with tomorrow counting 7× as much as day 7.
+            Models that stop before day 7 are scaled down a little: a perfect next-day-only
+            model tops out around 85, a perfect 7-day model reaches 100.</p>
+          <p><b>Skill by lead time</b> shows the score per lead day. In the grid, read down a
+            column for "who do I trust three days out". The colour bands are fixed, and lower
+            for rain, whose scores naturally run lower. Blank cells are days a model doesn't
+            forecast. The curves view colours four models and leaves the rest gray.</p>
+          <p><b>Rain W–L and form dots</b> look only at tomorrow: a win is a correct rain/no-rain
+            call for the day, a filled dot a day with next-day skill of 70 or more.
+            ▲▼ compares today's rank with a week ago.</p>
+          <p><b>Airport boards (✈)</b> score each model at the city's main airport, against real
+            METAR station readings for temperature and wind and radar for rain where available.
+            Gaps fall back to the model analysis. The Compare and labs charts still use the
+            analysis, so they can differ slightly from the standings, and some airports have a
+            shorter history so far.</p>
+          <p><b>Why not average error (RMSE)?</b> It rewards models that blur toward a smooth
+            average and punishes sharp forecasts that are slightly off in timing twice
+            (<a href="https://doi.org/10.1175/BAMS-D-23-0162.1">Ben Bouallègue et al. 2024</a>).
+            This board used it until August 2026; the expanded row still shows each model's old
+            rank, and the <a href="history.html">long-term trends</a> page still charts it.</p>
+          <p><b>Data:</b> forecasts come from Open-Meteo's
             <a href="https://open-meteo.com/en/docs/previous-runs-api">previous runs archive</a>
-            (what each model actually said 1 to 7 days earlier). The reference series is
-            <a href="https://open-meteo.com/en/docs"><code>best_match</code></a> with
-            <code>past_days=30</code>: Open-Meteo picks the single highest-resolution
-            model for the location (see "Data Sources" in their docs), and for past
-            hours serves that model's most recent, observation-fed runs. It is one
-            consistent series per location, not an agglomeration of forecasts, but it
-            is an analysis rather than a station record, so at short leads it can
-            slightly flatter models related to the one that provides it. The most
-            recent (incomplete) day is
-            always excluded. Preset cities add stored commercial scores and daily Compare
-            summaries: temperature and wind maxima, rain totals and wet-hour ranges.
-            Full commercial forecasts stay on the server. Public data is cached locally
-            for ~6 hours; commercial summaries are held in memory for 15 minutes.</p>
+            (what each model actually said 1 to 7 days earlier). Because the reference is a model
+            analysis rather than a station record, it can slightly flatter related models at short
+            leads. The latest, incomplete day is left out. Public data is cached for about
+            6 hours, commercial summaries for 15 minutes.</p>
         </div>
       </details>
       <p class="colophon">
