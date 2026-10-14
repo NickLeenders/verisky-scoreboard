@@ -95,7 +95,7 @@ Five kite destinations were enrolled for recurring forecast collection on
 | --- | --- | --- |
 | Maui / Kanaha | `maui-airport` | Kahului Airport PHOG, 20.8887, -156.43453; available METAR temperature and wind |
 | Cape Hatteras | `hatteras-airport` | Billy Mitchell Airport KHSE in Frisco, 35.23238, -75.6223; available METAR temperature and wind |
-| Tarifa | `tarifa` | 36.014444, -5.597222; model analysis, AEMET 6001 observation connection pending |
+| Tarifa | `tarifa` | 36.014444, -5.597222; available AEMET 6001 temperature and wind observations, with analysis for missing and earlier hours |
 | IJmuiden | `ijmuiden` | 52.463, 4.555; model analysis, collected KNMI 06225 wind not yet used in scoring |
 | Perth / Swanbourne | `swanbourne` | -31.96, 115.76; model analysis, current SYNOP 94614 feed only four reports daily |
 
@@ -111,6 +111,19 @@ server fallback. Registering forecasts does not imply station verification.
 Commercial history builds from enrollment; public models can have older
 archived runs. Run `scripts/pin-kite-observations.sql` after registering the
 airport cells to retain their METAR connections across airport-panel rebuilds.
+
+Tarifa's AEMET connection was added on 2026-10-14. The observation service polls
+the public [AEMET hourly XML](https://www.aemet.es/es/api-eltiempo/udat/tablas-graficas/horario/9/6001)
+every 30 minutes and retains the rolling 24-hour packets under `AEMET:6001` in
+`metar.observation` (`source = 'aemet'`). The first available reading is
+2026-10-13 17:00 UTC. It uses the XML's UTC timestamps and converts the website's
+km/h wind values to the observation store's knots. Only temperature and wind
+replace scoring truth; missing values and older history retain model analysis.
+The scorer explicitly pins cell `36.0,-5.6` without adding a fake airport to
+`airport_panel`. Compare and lab charts still use analysis. Fuente: AEMET.
+Collection can be disabled with `AEMET_TARIFA_COLLECT_ENABLED=false`; its latest
+successful packet is recorded in `metar.station_meta` as
+`aemet_tarifa_last_success`.
 
 ### Commercial score boundary
 

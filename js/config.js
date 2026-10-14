@@ -221,7 +221,7 @@ export const CITIES = [
     site: 'airport', cityAvailable: false,
     airport: { icao: 'KHSE', name: 'Billy Mitchell Airport (Frisco)', lat: 35.23238, lon: -75.6223 } },
   { id: 'tarifa', name: 'Tarifa', lat: 36.014444, lon: -5.597222, country: 'ES',
-    observationStatus: 'Forecast tracking is active. Scores use model analysis; AEMET Tarifa station 6001 is not connected to scoring yet.' },
+    observationStatus: 'This view uses model analysis. The server scoreboard uses available temperature and wind observations from AEMET Tarifa station 6001.' },
   { id: 'ijmuiden', name: 'IJmuiden', lat: 52.463, lon: 4.555, country: 'NL',
     observationStatus: 'Forecast tracking is active. KNMI IJmuiden wind observations are being collected, but scores still use model analysis pending station validation.' },
   { id: 'swanbourne', name: 'Perth / Swanbourne', lat: -31.96, lon: 115.76, country: 'AU',
